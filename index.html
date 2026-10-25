@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black" />
+  <title>Polizei Radar</title>
+
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { height: 100%; font-family: -apple-system, BlinkMacSystemFont, sans-serif; }
+
+    #map { height: 100vh; width: 100vw; }
+
+    #banner {
+      position: absolute;
+      top: 12px; left: 50%;
+      transform: translateX(-50%);
+      z-index: 1000;
+      background: rgba(0, 0, 0, 0.75);
+      color: white;
+      padding: 8px 16px;
+      border-radius: 20px;
+      font-size: 14px;
+      pointer-events: none;
+      white-space: nowrap;
+    }
+
+    #locate-btn {
+      position: absolute;
+      bottom: 24px; right: 16px;
+      z-index: 1000;
+      width: 48px; height: 48px;
+      border-radius: 50%;
+      border: none;
+      background: white;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+      font-size: 22px;
+      cursor: pointer;
+    }
+
+    .police-marker { font-size: 28px; text-align: center; line-height: 1; }
+  </style>
+</head>
+<body>
+  <div id="map"></div>
+  <div id="banner">Tap anywhere to report police</div>
+  <button id="locate-btn" title="Center on me">📍</button>
+
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/13.1.0/firebase-app.js";
+    import {
+      getFirestore,
+      collection,
+      addDoc,
+      onSnapshot,
+      serverTimestamp
+    } from "https://www.gstatic.com/firebasejs/13.1.0/firebase-firestore.js";
+
+    // Your Firebase config (already filled in)
+    const firebaseConfig = {
+      apiKey: "AIzaSyCh4CiPSYJgrxMOZTWNt3oz2QOB2hovnVQ",
+      authDomain: "polizei-radar.firebaseapp.com",
+      projectId: "polizei-radar",
+      storageBucket: "polizei-radar.firebasestorage.app",
+      messagingSenderId: "102962929295",
+      appId: "1:102962929295:web:6f7808eb4ae21add525afa",
+      measurementId: "G-YG2GDEBVYY"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+    const reportsRef = collection(db, "reports");
+
+    // --- Map setup ---
+    const map = L.map("map").setView([48.2082, 16.3738], 13); // Vienna default; change to your city
+    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+      attribution: "© OpenStreetMap"
+    }).addTo(map);
+
+    // --- Center on user ---
+    function centerOnUser() {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => map.setView([pos.coords.latitude, pos.coords.longitude], 15),
+        (err) => console.warn("Geolocation error:", err.message)
+      );
+    }
+    centerOnUser();
+    document.getElementById("locate-btn").addEventListener("click", centerOnUser);
+
+    // --- Report on map tap ---
+    map.on("click", async (e) => {
+      try {
+        await addDoc(reportsRef, {
+          lat: e.latlng.lat,
+          lng: e.latlng.lng,
+          time: serverTimestamp()
+        });
+      } catch (err) {
+        alert("Could not save report. Check your connection.");
+        console.error(err);
+      }
+    });
+
+    // --- Show reports in real time ---
+    const markers = {};
+
+    function makeMarker(lat, lng) {
+      return L.marker([lat, lng], {
+        icon: L.divIcon({
+          html: '<div class="police-marker">🚔</div>',
+          className: "",
+          iconSize: [28, 28],
+          iconAnchor: [14, 14]
+        })
+      });
+    }
+
+    onSnapshot(reportsRef, (snapshot) => {
+      snapshot.docChanges().forEach((change) => {
+        const id = change.doc.id;
+
+        if (change.type === "added") {
+          const { lat, lng } = change.doc.data();
+          markers[id] = makeMarker(lat, lng).addTo(map);
+        }
+
+        if (change.type === "removed" && markers[id]) {
+          map.removeLayer(markers[id]);
+          delete markers[id];
+        }
+      });
+    }, (err) => {
+      console.error("Snapshot error:", err);
+      alert("Firestore error — check the console and your database rules.");
+    });
+  </script>
+</body>
+</html>
