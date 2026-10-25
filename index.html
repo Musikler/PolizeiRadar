@@ -17,6 +17,7 @@
       --text-muted: #64748b;
       --accent: #2563eb;
       --danger: #ef4444;
+      --success: #22c55e;
       --glass: rgba(255, 255, 255, 0.85);
       --glass-border: rgba(0, 0, 0, 0.06);
       --shadow: 0 8px 32px rgba(0, 0, 0, 0.12);
@@ -39,7 +40,7 @@
     html, body { height: 100%; overflow: hidden; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif; background: var(--bg); color: var(--text); }
     button { font-family: inherit; touch-action: manipulation; }
 
-    #map { position: fixed; inset: 0; z-index: 0; }
+    #map { position: fixed; inset: 0; z-index: 0; background: var(--bg); }
 
     /* Top status pill */
     #top-bar {
@@ -173,6 +174,12 @@
       transform: translateX(-50%) translateY(0);
     }
 
+    /* Remove default Leaflet div-icon box */
+    .leaflet-div-icon {
+      background: transparent !important;
+      border: none !important;
+    }
+
     /* Police marker */
     .police-marker-wrap {
       position: relative;
@@ -261,6 +268,22 @@
       margin-bottom: 12px;
     }
 
+    .popup-confirm {
+      width: 100%;
+      padding: 10px;
+      margin-bottom: 8px;
+      border-radius: 10px;
+      border: none;
+      background: var(--success);
+      color: white;
+      font-weight: 600;
+      font-size: 14px;
+      cursor: pointer;
+      transition: opacity 0.15s ease;
+    }
+
+    .popup-confirm:active { opacity: 0.7; }
+
     .popup-clear {
       width: 100%;
       padding: 10px;
@@ -276,7 +299,7 @@
 
     .popup-clear:active { opacity: 0.7; }
 
-    /* Disable Leaflet default attribution style overwhelm */
+    /* Leaflet attribution restyled */
     .leaflet-control-attribution {
       background: var(--glass) !important;
       backdrop-filter: blur(10px);
@@ -309,6 +332,7 @@
     import { initializeApp } from "https://www.gstatic.com/firebasejs/13.1.0/firebase-app.js";
     import {
       getFirestore, collection, addDoc, deleteDoc, doc,
+      updateDoc, increment,
       onSnapshot, query, where, getDocs, serverTimestamp
     } from "https://www.gstatic.com/firebasejs/13.1.0/firebase-firestore.js";
 
@@ -325,14 +349,14 @@
 
     const HORNSTEIN = [47.8808, 16.4417];
     const DEFAULT_ZOOM = 14;
-    const REPORT_MAX_AGE_MIN = 90;  // auto-hide after 90 min
-    const REPORT_OLD_AFTER_MIN = 20; // turn gray after 20 min
+    const REPORT_MAX_AGE_MIN = 90;
+    const REPORT_OLD_AFTER_MIN = 20;
 
     const app = initializeApp(firebaseConfig);
     const db = getFirestore(app);
     const reportsRef = collection(db, "reports");
 
-    // --- CLIENT ID (to skip notifying about own reports) ---
+    // --- CLIENT ID ---
     function generateId() {
       if (window.crypto && crypto.randomUUID) {
         try { return crypto.randomUUID(); } catch (_) {}
@@ -351,26 +375,20 @@
       return id;
     }
 
-    // --- NOTIFICATION ICON (SVG data URI) ---
+    // --- NOTIFICATION ICON ---
     const policeIcon = 'data:image/svg+xml;base64,' + btoa(
       `<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64"><rect width="64" height="64" rx="14" fill="#2563eb"/><text x="32" y="44" text-anchor="middle" font-size="36">🚔</text></svg>`
     );
 
     // --- MAP ---
-    const dark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-    const tileUrl = dark
-      ? 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png'
-      : 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png';
-
     const map = L.map('map', {
       zoomControl: false,
       attributionControl: true
     }).setView(HORNSTEIN, DEFAULT_ZOOM);
 
-    L.tileLayer(tileUrl, {
-      attribution: '&copy; OpenStreetMap &copy; CARTO',
-      subdomains: 'abcd',
-      maxZoom: 20
+    L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '&copy; OpenStreetMap contributors',
+      maxZoom: 19
     }).addTo(map);
 
     // --- TOAST ---
@@ -465,7 +483,8 @@
           lat: e.latlng.lat,
           lng: e.latlng.lng,
           time: serverTimestamp(),
-          clientId: getClientId()
+          clientId: getClientId(),
+          confirmations: 1
         });
         hideHint();
         if (navigator.vibrate) navigator.vibrate(30);
@@ -475,6 +494,21 @@
         showToast('Konnte nicht speichern');
       }
     });
+
+    // --- CONFIRM ("Noch da") ---
+    window.confirmReport = async function(docId) {
+      try {
+        await updateDoc(doc(db, 'reports', docId), {
+          time: serverTimestamp(),
+          confirmations: increment(1)
+        });
+        showToast('Bestätigt ✓');
+        if (navigator.vibrate) navigator.vibrate(20);
+      } catch (err) {
+        console.error(err);
+        showToast('Konnte nicht bestätigen');
+      }
+    };
 
     // --- DELETE ---
     window.deleteReport = async function(docId) {
@@ -516,20 +550,28 @@
     }
 
     // --- POPUP HTML ---
-    function buildPopupHtml(docId, timestamp) {
+    function buildPopupHtml(docId, timestamp, confirmations = 0) {
+      const confirmedText = confirmations > 0
+        ? ` · ${confirmations}× bestätigt`
+        : '';
       return `
         <div class="popup">
           <div class="popup-title">🚔 Polizei</div>
-          <div class="popup-age">${timeAgo(timestamp)}</div>
-          <button class="popup-clear" onclick="window.deleteReport('${docId}')">Entfernen</button>
+          <div class="popup-age">${timeAgo(timestamp)}${confirmedText}</div>
+          <button class="popup-confirm" onclick="window.confirmReport('${docId}')">
+            ✓ Noch da
+          </button>
+          <button class="popup-clear" onclick="window.deleteReport('${docId}')">
+            Entfernen
+          </button>
         </div>
       `;
     }
 
     // --- MARKERS ---
-    const markers = new Map(); // id -> { marker, data }
+    const markers = new Map();
 
-    function makeMarker(lat, lng, docId, timestamp) {
+    function makeMarker(lat, lng, docId, timestamp, confirmations = 0) {
       const isOld = ageMinutes(timestamp) > REPORT_OLD_AFTER_MIN;
       const icon = L.divIcon({
         html: `<div class="police-marker-wrap ${isOld ? 'old' : ''}">
@@ -541,14 +583,14 @@
       });
 
       const marker = L.marker([lat, lng], { icon });
-      marker.bindPopup(buildPopupHtml(docId, timestamp), {
+      marker.bindPopup(buildPopupHtml(docId, timestamp, confirmations), {
         minWidth: 200,
         maxWidth: 260,
         closeButton: false,
         offset: [0, -12]
       });
       marker.on('popupopen', () => {
-        marker.setPopupContent(buildPopupHtml(docId, timestamp));
+        marker.setPopupContent(buildPopupHtml(docId, timestamp, confirmations));
       });
       return marker;
     }
@@ -566,7 +608,7 @@
       }
     }
 
-    // --- CLEANUP OLD REPORTS ---
+    // --- CLEANUP ---
     async function cleanupOldReports() {
       try {
         const cutoff = new Date(Date.now() - REPORT_MAX_AGE_MIN * 60 * 1000);
@@ -591,20 +633,44 @@
     onSnapshot(reportsRef, (snapshot) => {
       snapshot.docChanges().forEach((change) => {
         const id = change.doc.id;
+        const data = change.doc.data();
 
+        // Handle "Noch da" updates — refresh timestamp + popup
+        if (change.type === 'modified') {
+          const entry = markers.get(id);
+          if (entry) {
+            entry.data = data;
+            entry.marker.setPopupContent(
+              buildPopupHtml(id, data.time, data.confirmations || 0)
+            );
+
+            const isOld = ageMinutes(data.time) > REPORT_OLD_AFTER_MIN;
+            const el = entry.marker.getElement();
+            if (el) {
+              const wrap = el.querySelector('.police-marker-wrap');
+              const dot = el.querySelector('.police-marker');
+              if (wrap && dot) {
+                wrap.classList.toggle('old', isOld);
+                dot.classList.toggle('old', isOld);
+              }
+            }
+          }
+          return;
+        }
+
+        // Handle new reports
         if (change.type === 'added') {
-          const data = change.doc.data();
-
-          // Skip and remove if too old
           if (ageMinutes(data.time) > REPORT_MAX_AGE_MIN) {
             deleteDoc(change.doc.ref).catch(() => {});
             return;
           }
 
-          const marker = makeMarker(data.lat, data.lng, id, data.time).addTo(map);
+          const marker = makeMarker(
+            data.lat, data.lng, id, data.time, data.confirmations || 0
+          ).addTo(map);
+
           markers.set(id, { marker, data });
 
-          // Notify on new report (skip own, skip initial, only recent)
           if (!isInitialLoad && 'Notification' in window && Notification.permission === 'granted') {
             const isMine = data.clientId === getClientId();
             const recentlyAdded = ageMinutes(data.time) < 1;
@@ -621,6 +687,7 @@
           }
         }
 
+        // Handle deletions
         if (change.type === 'removed') {
           const entry = markers.get(id);
           if (entry) {
@@ -639,15 +706,12 @@
 
     // --- STARTUP ---
     cleanupOldReports();
-    setInterval(cleanupOldReports, 10 * 60 * 1000); // every 10 min
+    setInterval(cleanupOldReports, 10 * 60 * 1000);
 
-    // Refresh "old" marker styling every minute
+    // Refresh marker styling (old/new) every minute
     setInterval(() => {
-      markers.forEach(({ marker, data }, id) => {
+      markers.forEach(({ marker, data }) => {
         const isOld = ageMinutes(data.time) > REPORT_OLD_AFTER_MIN;
-        const icon = marker.options.icon;
-        if (!icon) return;
-        // Rebuild icon HTML to reflect old/new
         const el = marker.getElement();
         if (!el) return;
         const wrap = el.querySelector('.police-marker-wrap');
