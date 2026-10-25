@@ -1,973 +1,771 @@
 <!DOCTYPE html>
 <html lang="de">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
-  <meta name="mobile-web-app-capable" content="yes" />
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-  <meta name="theme-color" content="#0f172a" />
-  <link rel="icon" href="data:," />
-  <title>Polizei Radar</title>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#0f172a">
+<title>Polizei Radar</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<style>
+:root {
+  --bg: #f4f6fa;
+  --surface: #ffffff;
+  --glass: rgba(255,255,255,0.85);
+  --text: #0f172a;
+  --muted: #64748b;
+  --border: rgba(0,0,0,0.08);
+  --accent: #2563eb;
+  --danger: #ef4444;
+  --success: #10b981;
+  --shadow: 0 4px 20px rgba(0,0,0,0.1);
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0b1220;
+    --surface: #1e293b;
+    --glass: rgba(30,41,59,0.85);
+    --text: #f1f5f9;
+    --muted: #94a3b8;
+    --border: rgba(255,255,255,0.1);
+    --shadow: 0 4px 20px rgba(0,0,0,0.5);
+  }
+}
+* { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+html, body { height: 100%; overflow: hidden; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif; background: var(--bg); color: var(--text); }
+button { font-family: inherit; border: none; background: none; color: inherit; cursor: pointer; touch-action: manipulation; }
 
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+#map { position: fixed; inset: 0; z-index: 0; }
 
-  <style>
-    :root {
-      --bg: #f5f7fa;
-      --surface: #ffffff;
-      --surface-elevated: rgba(255, 255, 255, 0.92);
-      --text: #0f172a;
-      --text-secondary: #64748b;
-      --text-tertiary: #94a3b8;
-      --border: rgba(0, 0, 0, 0.06);
-      --accent: #2563eb;
-      --accent-soft: rgba(37, 99, 235, 0.12);
-      --danger: #ef4444;
-      --danger-soft: rgba(239, 68, 68, 0.12);
-      --success: #10b981;
-      --success-soft: rgba(16, 185, 129, 0.12);
-      --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.06);
-      --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.08);
-      --shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.12);
-      --shadow-xl: 0 24px 48px rgba(0, 0, 0, 0.18);
-      --safe-top: env(safe-area-inset-top, 0px);
-      --safe-bottom: env(safe-area-inset-bottom, 0px);
-      --radius-sm: 12px;
-      --radius-md: 16px;
-      --radius-lg: 20px;
-      --radius-xl: 28px;
-    }
+#error-banner {
+  position: fixed;
+  top: calc(12px + var(--safe-top));
+  left: 12px; right: 12px;
+  background: var(--danger);
+  color: white;
+  padding: 10px 14px;
+  border-radius: 10px;
+  font-size: 12px;
+  font-weight: 600;
+  z-index: 5000;
+  box-shadow: var(--shadow);
+  display: none;
+  word-break: break-word;
+}
 
-    @media (prefers-color-scheme: dark) {
-      :root {
-        --bg: #0b1220;
-        --surface: #1e293b;
-        --surface-elevated: rgba(30, 41, 59, 0.92);
-        --text: #f1f5f9;
-        --text-secondary: #94a3b8;
-        --text-tertiary: #64748b;
-        --border: rgba(255, 255, 255, 0.08);
-        --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.3);
-        --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.4);
-        --shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.5);
-        --shadow-xl: 0 24px 48px rgba(0, 0, 0, 0.6);
-      }
-    }
+#header {
+  position: fixed;
+  top: 0; left: 0; right: 0;
+  padding: calc(12px + var(--safe-top)) 16px 12px;
+  z-index: 1000;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  pointer-events: none;
+}
+.brand, #status {
+  background: var(--glass);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 10px 16px;
+  font-size: 14px;
+  font-weight: 700;
+  box-shadow: var(--shadow);
+  pointer-events: auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+#status { font-size: 13px; font-weight: 600; color: var(--muted); }
+#status .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); }
+#status.live .dot { background: var(--danger); animation: pulse 2s infinite; }
+#status.live { color: var(--danger); }
+@keyframes pulse {
+  0% { box-shadow: 0 0 0 0 rgba(239,68,68,0.5); }
+  70% { box-shadow: 0 0 0 8px rgba(239,68,68,0); }
+  100% { box-shadow: 0 0 0 0 rgba(239,68,68,0); }
+}
 
-    * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
-    html, body { height: 100%; overflow: hidden; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif; background: var(--bg); color: var(--text); -webkit-font-smoothing: antialiased; }
-    button { font-family: inherit; touch-action: manipulation; border: none; background: none; color: inherit; cursor: pointer; }
+#toolbar {
+  position: fixed;
+  bottom: 0; left: 0; right: 0;
+  padding: 20px 24px calc(20px + var(--safe-bottom));
+  z-index: 1000;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 20px;
+  pointer-events: none;
+}
+.btn {
+  pointer-events: auto;
+  width: 54px; height: 54px;
+  border-radius: 50%;
+  background: var(--glass);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow);
+  display: flex; align-items: center; justify-content: center;
+  transition: transform 0.15s;
+}
+.btn:active { transform: scale(0.9); }
+.btn.active { background: var(--accent); color: white; border-color: var(--accent); }
+.btn svg { width: 22px; height: 22px; stroke-width: 2; }
 
-    #map { position: fixed; inset: 0; z-index: 0; }
+.fab {
+  pointer-events: auto;
+  width: 68px; height: 68px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #3b82f6, #2563eb);
+  box-shadow: 0 8px 24px rgba(37,99,235,0.45);
+  display: flex; align-items: center; justify-content: center;
+  color: white;
+  transition: transform 0.15s;
+}
+.fab:active { transform: scale(0.9); }
+.fab svg { width: 30px; height: 30px; stroke-width: 2.5; }
 
-    /* ============ HEADER ============ */
-    #app-header {
-      position: fixed;
-      top: 0; left: 0; right: 0;
-      padding: calc(10px + var(--safe-top)) 16px 10px;
-      z-index: 1000;
-      pointer-events: none;
-    }
+#hint {
+  position: fixed;
+  bottom: calc(100px + var(--safe-bottom));
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--glass);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid var(--border);
+  padding: 10px 18px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--muted);
+  box-shadow: var(--shadow);
+  z-index: 900;
+  pointer-events: none;
+  white-space: nowrap;
+  transition: opacity 0.4s, transform 0.4s;
+}
+#hint.hidden { opacity: 0; transform: translateX(-50%) translateY(10px); }
 
-    .header-inner {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 12px;
-    }
+#toast {
+  position: fixed;
+  top: calc(72px + var(--safe-top));
+  left: 50%;
+  transform: translateX(-50%) translateY(-20px);
+  background: var(--text);
+  color: var(--bg);
+  padding: 12px 20px;
+  border-radius: 12px;
+  font-size: 14px;
+  font-weight: 600;
+  box-shadow: var(--shadow);
+  z-index: 3000;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.25s, transform 0.25s;
+  max-width: 90vw;
+  text-align: center;
+}
+#toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
 
-    .brand {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      background: var(--surface-elevated);
-      backdrop-filter: blur(24px) saturate(180%);
-      -webkit-backdrop-filter: blur(24px) saturate(180%);
-      border: 1px solid var(--border);
-      padding: 10px 14px;
-      border-radius: var(--radius-xl);
-      box-shadow: var(--shadow-md);
-      pointer-events: auto;
-    }
+.leaflet-div-icon { background: transparent !important; border: none !important; }
 
-    .brand-icon { font-size: 18px; line-height: 1; }
-    .brand-name { font-size: 15px; font-weight: 700; letter-spacing: -0.02em; }
+.marker-wrap { position: relative; width: 44px; height: 44px; }
+.marker-wrap::before {
+  content: '';
+  position: absolute;
+  inset: -6px;
+  border-radius: 50%;
+  background: rgba(239,68,68,0.35);
+  animation: mp 2s infinite;
+  z-index: 1;
+}
+.marker-wrap.old::before { display: none; }
+.marker {
+  position: relative;
+  width: 44px; height: 44px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #ef4444, #dc2626);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 20px;
+  box-shadow: 0 4px 16px rgba(239,68,68,0.45), 0 0 0 3px white;
+  z-index: 2;
+}
+.marker.old { background: linear-gradient(135deg, #94a3b8, #64748b); opacity: 0.7; }
+@keyframes mp { 0% { transform: scale(1); opacity: 0.6; } 100% { transform: scale(1.8); opacity: 0; } }
 
-    #live-badge {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      background: var(--surface-elevated);
-      backdrop-filter: blur(24px) saturate(180%);
-      -webkit-backdrop-filter: blur(24px) saturate(180%);
-      border: 1px solid var(--border);
-      padding: 10px 14px;
-      border-radius: var(--radius-xl);
-      box-shadow: var(--shadow-md);
-      font-size: 13px;
-      font-weight: 600;
-      color: var(--text-secondary);
-      pointer-events: auto;
-    }
+.user-dot { position: relative; width: 26px; height: 26px; }
+.user-dot::before {
+  content: ''; position: absolute; inset: 0;
+  border-radius: 50%; background: rgba(37,99,235,0.25);
+  animation: up 2s infinite;
+}
+.user-dot-inner {
+  position: absolute; inset: 7px;
+  border-radius: 50%;
+  background: #2563eb;
+  border: 2px solid white;
+  box-shadow: 0 0 12px rgba(37,99,235,0.6);
+}
+@keyframes up { 0% { transform: scale(1); opacity: 0.7; } 100% { transform: scale(2); opacity: 0; } }
 
-    .live-dot {
-      width: 8px; height: 8px;
-      border-radius: 50%;
-      background: var(--success);
-      box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.5);
-      animation: pulseDot 2s infinite;
-      flex-shrink: 0;
-    }
+#backdrop {
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,0.3);
+  z-index: 1500;
+  opacity: 0; pointer-events: none;
+  transition: opacity 0.28s;
+}
+#backdrop.open { opacity: 1; pointer-events: auto; }
 
-    #live-badge.active .live-dot {
-      background: var(--danger);
-      box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.5);
-      animation: pulseDot 2s infinite;
-    }
+#sheet {
+  position: fixed;
+  bottom: 0; left: 0; right: 0;
+  z-index: 1600;
+  background: var(--surface);
+  border-radius: 24px 24px 0 0;
+  box-shadow: 0 -8px 32px rgba(0,0,0,0.2);
+  transform: translateY(100%);
+  transition: transform 0.32s cubic-bezier(0.22, 1, 0.36, 1);
+  padding: 10px 20px calc(24px + var(--safe-bottom));
+  max-width: 500px;
+  margin: 0 auto;
+}
+#sheet.open { transform: translateY(0); }
+.sheet-handle { width: 40px; height: 4px; background: var(--border); border-radius: 2px; margin: 4px auto 20px; }
+.sheet-header { display: flex; align-items: center; gap: 14px; margin-bottom: 20px; }
+.sheet-icon {
+  width: 54px; height: 54px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #ef4444, #dc2626);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 24px;
+  box-shadow: 0 4px 16px rgba(239,68,68,0.35);
+  flex-shrink: 0;
+}
+.sheet-title { font-size: 17px; font-weight: 700; margin-bottom: 3px; }
+.sheet-meta { font-size: 13px; color: var(--muted); font-weight: 500; }
+.sheet-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.btn-confirm {
+  padding: 14px;
+  border-radius: 14px;
+  background: var(--success);
+  color: white;
+  font-weight: 700;
+  font-size: 15px;
+  box-shadow: 0 4px 12px rgba(16,185,129,0.25);
+  transition: opacity 0.15s;
+}
+.btn-delete {
+  padding: 14px;
+  border-radius: 14px;
+  background: rgba(239,68,68,0.12);
+  color: var(--danger);
+  font-weight: 700;
+  font-size: 15px;
+  transition: opacity 0.15s;
+}
+.btn-confirm:active, .btn-delete:active { opacity: 0.7; }
 
-    #live-badge.active {
-      color: var(--danger);
-    }
-
-    @keyframes pulseDot {
-      0% { box-shadow: 0 0 0 0 currentColor; }
-      70% { box-shadow: 0 0 0 8px transparent; }
-      100% { box-shadow: 0 0 0 0 transparent; }
-    }
-
-    /* ============ TOOLBAR ============ */
-    #toolbar {
-      position: fixed;
-      bottom: 0; left: 0; right: 0;
-      padding: 16px 24px calc(16px + var(--safe-bottom));
-      z-index: 1000;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      gap: 20px;
-      pointer-events: none;
-    }
-
-    .circle-btn {
-      pointer-events: auto;
-      width: 52px; height: 52px;
-      border-radius: 50%;
-      background: var(--surface-elevated);
-      backdrop-filter: blur(24px) saturate(180%);
-      -webkit-backdrop-filter: blur(24px) saturate(180%);
-      border: 1px solid var(--border);
-      box-shadow: var(--shadow-md);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      transition: transform 0.15s ease, background 0.2s ease;
-      color: var(--text);
-    }
-
-    .circle-btn:active { transform: scale(0.9); }
-
-    .circle-btn.active {
-      background: var(--accent);
-      color: white;
-      border-color: var(--accent);
-    }
-
-    .circle-btn svg {
-      width: 22px;
-      height: 22px;
-    }
-
-    .fab {
-      pointer-events: auto;
-      width: 64px; height: 64px;
-      border-radius: 50%;
-      background: linear-gradient(135deg, #3b82f6, #2563eb);
-      box-shadow: 0 8px 24px rgba(37, 99, 235, 0.45), 0 2px 6px rgba(37, 99, 235, 0.3);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      color: white;
-      transition: transform 0.15s ease, box-shadow 0.2s ease;
-    }
-
-    .fab:active {
-      transform: scale(0.9);
-      box-shadow: 0 4px 12px rgba(37, 99, 235, 0.4);
-    }
-
-    .fab svg {
-      width: 28px;
-      height: 28px;
-    }
-
-    /* ============ HINT ============ */
-    #hint {
-      position: fixed;
-      bottom: calc(96px + var(--safe-bottom));
-      left: 50%;
-      transform: translateX(-50%);
-      background: var(--surface-elevated);
-      backdrop-filter: blur(24px) saturate(180%);
-      -webkit-backdrop-filter: blur(24px) saturate(180%);
-      border: 1px solid var(--border);
-      padding: 10px 18px;
-      border-radius: var(--radius-xl);
-      font-size: 13px;
-      font-weight: 500;
-      color: var(--text-secondary);
-      box-shadow: var(--shadow-md);
-      z-index: 900;
-      pointer-events: none;
-      white-space: nowrap;
-      transition: opacity 0.4s ease, transform 0.4s ease;
-    }
-
-    #hint.hidden {
-      opacity: 0;
-      transform: translateX(-50%) translateY(12px);
-    }
-
-    /* ============ TOAST ============ */
-    #toast {
-      position: fixed;
-      top: calc(80px + var(--safe-top));
-      left: 50%;
-      transform: translateX(-50%) translateY(-16px);
-      background: var(--text);
-      color: var(--bg);
-      padding: 12px 20px;
-      border-radius: var(--radius-md);
-      font-size: 14px;
-      font-weight: 600;
-      box-shadow: var(--shadow-xl);
-      z-index: 3000;
-      opacity: 0;
-      pointer-events: none;
-      transition: opacity 0.25s ease, transform 0.25s ease;
-      max-width: 90vw;
-      text-align: center;
-    }
-
-    #toast.show {
-      opacity: 1;
-      transform: translateX(-50%) translateY(0);
-    }
-
-    /* ============ MARKERS ============ */
-    .leaflet-div-icon {
-      background: transparent !important;
-      border: none !important;
-    }
-
-    .police-marker-wrap {
-      position: relative;
-      width: 44px;
-      height: 44px;
-    }
-
-    .police-marker-wrap::before {
-      content: '';
-      position: absolute;
-      inset: -6px;
-      border-radius: 50%;
-      background: rgba(239, 68, 68, 0.35);
-      animation: markerPulse 2s infinite;
-      z-index: 1;
-    }
-
-    .police-marker-wrap.old::before { display: none; }
-
-    .police-marker {
-      position: relative;
-      width: 44px; height: 44px;
-      border-radius: 50%;
-      background: linear-gradient(135deg, #ef4444, #dc2626);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 20px;
-      box-shadow: 0 4px 16px rgba(239, 68, 68, 0.45), 0 0 0 3px white;
-      z-index: 2;
-      transition: transform 0.15s ease;
-    }
-
-    .police-marker.old {
-      background: linear-gradient(135deg, #94a3b8, #64748b);
-      box-shadow: 0 4px 12px rgba(100, 116, 139, 0.3), 0 0 0 3px white;
-      opacity: 0.7;
-    }
-
-    @keyframes markerPulse {
-      0% { transform: scale(1); opacity: 0.6; }
-      100% { transform: scale(1.7); opacity: 0; }
-    }
-
-    /* User location dot */
-    .user-dot {
-      width: 26px; height: 26px;
-      position: relative;
-    }
-
-    .user-dot::before {
-      content: '';
-      position: absolute;
-      inset: 0;
-      border-radius: 50%;
-      background: rgba(37, 99, 235, 0.25);
-      animation: userPulse 2s infinite;
-    }
-
-    .user-dot-inner {
-      position: absolute;
-      inset: 7px;
-      border-radius: 50%;
-      background: #2563eb;
-      border: 2px solid white;
-      box-shadow: 0 0 12px rgba(37, 99, 235, 0.6);
-    }
-
-    @keyframes userPulse {
-      0% { transform: scale(1); opacity: 0.7; }
-      100% { transform: scale(2); opacity: 0; }
-    }
-
-    /* ============ BOTTOM SHEET ============ */
-    #sheet-backdrop {
-      position: fixed;
-      inset: 0;
-      background: rgba(0, 0, 0, 0.3);
-      backdrop-filter: blur(2px);
-      -webkit-backdrop-filter: blur(2px);
-      z-index: 1500;
-      opacity: 0;
-      pointer-events: none;
-      transition: opacity 0.28s ease;
-    }
-
-    #sheet-backdrop.open {
-      opacity: 1;
-      pointer-events: auto;
-    }
-
-    #sheet {
-      position: fixed;
-      bottom: 0; left: 0; right: 0;
-      z-index: 1600;
-      background: var(--surface);
-      border-radius: var(--radius-xl) var(--radius-xl) 0 0;
-      box-shadow: var(--shadow-xl);
-      transform: translateY(100%);
-      transition: transform 0.32s cubic-bezier(0.22, 1, 0.36, 1);
-      padding: 10px 20px calc(24px + var(--safe-bottom));
-      max-width: 500px;
-      margin: 0 auto;
-    }
-
-    #sheet.open {
-      transform: translateY(0);
-    }
-
-    .sheet-handle {
-      width: 40px; height: 4px;
-      background: var(--border);
-      border-radius: 2px;
-      margin: 4px auto 20px;
-    }
-
-    .sheet-header {
-      display: flex;
-      align-items: center;
-      gap: 14px;
-      margin-bottom: 20px;
-    }
-
-    .sheet-icon {
-      width: 52px; height: 52px;
-      border-radius: 50%;
-      background: linear-gradient(135deg, #ef4444, #dc2626);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 24px;
-      box-shadow: 0 4px 16px rgba(239, 68, 68, 0.35);
-      flex-shrink: 0;
-    }
-
-    .sheet-info { flex: 1; min-width: 0; }
-
-    .sheet-title {
-      font-size: 17px;
-      font-weight: 700;
-      color: var(--text);
-      margin-bottom: 3px;
-      letter-spacing: -0.02em;
-    }
-
-    .sheet-meta {
-      font-size: 13px;
-      color: var(--text-secondary);
-      font-weight: 500;
-    }
-
-    .sheet-actions {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 10px;
-    }
-
-    .btn-confirm, .btn-delete {
-      padding: 14px;
-      border-radius: var(--radius-md);
-      font-size: 15px;
-      font-weight: 700;
-      transition: opacity 0.15s ease, transform 0.15s ease;
-      letter-spacing: -0.01em;
-    }
-
-    .btn-confirm {
-      background: var(--success);
-      color: white;
-      box-shadow: 0 4px 12px rgba(16, 185, 129, 0.25);
-    }
-
-    .btn-delete {
-      background: var(--danger-soft);
-      color: var(--danger);
-    }
-
-    .btn-confirm:active, .btn-delete:active {
-      opacity: 0.7;
-      transform: scale(0.97);
-    }
-
-    /* Leaflet attribution */
-    .leaflet-control-attribution {
-      background: var(--surface-elevated) !important;
-      backdrop-filter: blur(10px);
-      border-radius: 8px 0 0 0;
-      font-size: 10px !important;
-      color: var(--text-tertiary) !important;
-    }
-
-    .leaflet-control-attribution a {
-      color: var(--text-secondary) !important;
-    }
-  </style>
+.leaflet-control-attribution {
+  background: var(--glass) !important;
+  backdrop-filter: blur(10px);
+  border-radius: 8px 0 0 0;
+  font-size: 10px !important;
+}
+</style>
 </head>
 <body>
-  <header id="app-header">
-    <div class="header-inner">
-      <div class="brand">
-        <span class="brand-icon">🚔</span>
-        <span class="brand-name">Polizei Radar</span>
-      </div>
-      <div id="live-badge" class="empty">
-        <span class="live-dot"></span>
-        <span id="live-text">Bereit</span>
-      </div>
-    </div>
-  </header>
 
-  <div id="map"></div>
+<div id="error-banner"></div>
 
-  <div id="hint">Tippe auf die Karte, um Polizei zu melden</div>
+<header id="header">
+  <div class="brand">🚔 Polizei Radar</div>
+  <div id="status"><span class="dot"></span><span id="status-text">Bereit</span></div>
+</header>
 
-  <nav id="toolbar">
-    <button id="locate-btn" class="circle-btn" aria-label="Mein Standort">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-        <circle cx="12" cy="12" r="3"/>
-        <path d="M12 2v3M12 19v3M2 12h3M19 12h3"/>
-      </svg>
-    </button>
+<div id="map"></div>
 
-    <button id="report-btn" class="fab" aria-label="Polizei melden">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-        <path d="M12 5v14M5 12h14"/>
-      </svg>
-    </button>
+<div id="hint">Tippe auf die Karte, um Polizei zu melden</div>
 
-    <button id="notify-btn" class="circle-btn" aria-label="Benachrichtigungen">
-      <svg id="notify-icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-        <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
-        <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
-        <line id="notify-slash" x1="3" y1="3" x2="21" y2="21" stroke-width="2"/>
-      </svg>
-    </button>
-  </nav>
+<nav id="toolbar">
+  <button id="locate-btn" class="btn" aria-label="Standort">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
+      <circle cx="12" cy="12" r="3"/>
+      <path d="M12 2v3M12 19v3M2 12h3M19 12h3"/>
+    </svg>
+  </button>
+  <button id="report-btn" class="fab" aria-label="Melden">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M12 5v14M5 12h14"/>
+    </svg>
+  </button>
+  <button id="notify-btn" class="btn" aria-label="Benachrichtigungen">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
+      <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
+    </svg>
+  </button>
+</nav>
 
-  <div id="sheet-backdrop"></div>
-  <div id="sheet">
-    <div class="sheet-handle"></div>
-    <div class="sheet-header">
-      <div class="sheet-icon">🚔</div>
-      <div class="sheet-info">
-        <div class="sheet-title">Polizeikontrolle</div>
-        <div class="sheet-meta" id="sheet-meta">gerade eben</div>
-      </div>
-    </div>
-    <div class="sheet-actions">
-      <button id="sheet-confirm" class="btn-confirm">✓ Noch da</button>
-      <button id="sheet-delete" class="btn-delete">Entfernen</button>
+<div id="backdrop"></div>
+<div id="sheet">
+  <div class="sheet-handle"></div>
+  <div class="sheet-header">
+    <div class="sheet-icon">🚔</div>
+    <div>
+      <div class="sheet-title">Polizeikontrolle</div>
+      <div class="sheet-meta" id="sheet-meta">gerade eben</div>
     </div>
   </div>
+  <div class="sheet-actions">
+    <button id="sheet-confirm" class="btn-confirm">✓ Noch da</button>
+    <button id="sheet-delete" class="btn-delete">Entfernen</button>
+  </div>
+</div>
 
-  <div id="toast"></div>
+<div id="toast"></div>
 
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<!-- Classic scripts, NOT modules — no imports that can silently fail -->
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
 
-  <script type="module">
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/13.1.0/firebase-app.js";
-    import {
-      getFirestore, collection, addDoc, deleteDoc, doc,
-      updateDoc, increment,
-      onSnapshot, query, where, getDocs, serverTimestamp
-    } from "https://www.gstatic.com/firebasejs/13.1.0/firebase-firestore.js";
+<script>
+(function () {
+  'use strict';
 
-    // ============ CONFIG ============
-    const firebaseConfig = {
-      apiKey: "AIzaSyCh4CiPSYJgrxMOZTWNt3oz2QOB2hovnVQ",
-      authDomain: "polizei-radar.firebaseapp.com",
-      projectId: "polizei-radar",
-      storageBucket: "polizei-radar.firebasestorage.app",
-      messagingSenderId: "102962929295",
-      appId: "1:102962929295:web:6f7808eb4ae21add525afa",
-      measurementId: "G-YG2GDEBVYY"
-    };
+  // ============================================================
+  // STEP 0 — Visible error reporting
+  // ============================================================
+  var errorEl = document.getElementById('error-banner');
+  function showError(msg) {
+    errorEl.textContent = msg;
+    errorEl.style.display = 'block';
+    console.error(msg);
+    setTimeout(function () { errorEl.style.display = 'none'; }, 8000);
+  }
+  window.addEventListener('error', function (e) {
+    showError('Fehler: ' + (e.message || 'Unbekannt'));
+  });
 
-    const HORNSTEIN = [47.8808, 16.4417];
-    const DEFAULT_ZOOM = 14;
-    const REPORT_MAX_AGE_MIN = 90;
-    const REPORT_OLD_AFTER_MIN = 20;
+  // ============================================================
+  // STEP 1 — Toast
+  // ============================================================
+  var toastEl = document.getElementById('toast');
+  var toastTimer;
+  function toast(msg, dur) {
+    toastEl.textContent = msg;
+    toastEl.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(function () { toastEl.classList.remove('show'); }, dur || 2400);
+  }
 
-    const app = initializeApp(firebaseConfig);
-    const db = getFirestore(app);
-    const reportsRef = collection(db, "reports");
+  // ============================================================
+  // STEP 2 — MAP (runs BEFORE anything Firebase — map always shows)
+  // ============================================================
+  if (typeof L === 'undefined') {
+    showError('Leaflet konnte nicht geladen werden. Prüfe Internet / Adblocker.');
+    return;
+  }
 
-    // ============ CLIENT ID ============
-    function generateId() {
-      if (window.crypto && crypto.randomUUID) {
-        try { return crypto.randomUUID(); } catch (_) {}
-      }
-      return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
-        const r = Math.random() * 16 | 0;
+  var map = L.map('map', { zoomControl: false, attributionControl: true })
+    .setView([47.8808, 16.4417], 14); // Hornstein
+
+  L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '&copy; OpenStreetMap',
+    maxZoom: 19
+  }).addTo(map);
+
+  console.log('[OK] Map loaded');
+
+  // ============================================================
+  // STEP 3 — FIREBASE (best-effort; map works even if this fails)
+  // ============================================================
+  var db = null;
+  var reportsRef = null;
+
+  if (typeof firebase === 'undefined') {
+    showError('Firebase SDK nicht geladen. Karte funktioniert, Meldungen nicht.');
+  } else {
+    try {
+      firebase.initializeApp({
+        apiKey: "AIzaSyCh4CiPSYJgrxMOZTWNt3oz2QOB2hovnVQ",
+        authDomain: "polizei-radar.firebaseapp.com",
+        projectId: "polizei-radar",
+        storageBucket: "polizei-radar.firebasestorage.app",
+        messagingSenderId: "102962929295",
+        appId: "1:102962929295:web:6f7808eb4ae21add525afa"
+      });
+      db = firebase.firestore();
+      reportsRef = db.collection('reports');
+      console.log('[OK] Firebase connected');
+    } catch (err) {
+      console.error('Firebase init error:', err);
+      showError('Datenbank-Fehler: ' + err.message);
+    }
+  }
+
+  // ============================================================
+  // STEP 4 — Client ID (own report detection)
+  // ============================================================
+  function uid() {
+    try { return crypto.randomUUID(); } catch (e) {
+      return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
+        var r = Math.random() * 16 | 0;
         return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16);
       });
     }
-    function getClientId() {
-      let id = localStorage.getItem('polizei_client_id');
-      if (!id) {
-        id = generateId();
-        localStorage.setItem('polizei_client_id', id);
+  }
+  function getClientId() {
+    var id = localStorage.getItem('polizei_client_id');
+    if (!id) { id = uid(); localStorage.setItem('polizei_client_id', id); }
+    return id;
+  }
+
+  // ============================================================
+  // STEP 5 — Notification icon
+  // ============================================================
+  var policeIcon = 'data:image/svg+xml;base64,' + btoa(
+    '<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64"><rect width="64" height="64" rx="14" fill="#2563eb"/><text x="32" y="44" text-anchor="middle" font-size="36">🚔</text></svg>'
+  );
+
+  // ============================================================
+  // STEP 6 — User location dot
+  // ============================================================
+  var userMarker = null;
+  var userIcon = L.divIcon({
+    html: '<div class="user-dot"><div class="user-dot-inner"></div></div>',
+    className: '',
+    iconSize: [26, 26],
+    iconAnchor: [13, 13]
+  });
+  function showUserDot(lat, lng) {
+    if (userMarker) userMarker.setLatLng([lat, lng]);
+    else userMarker = L.marker([lat, lng], { icon: userIcon, interactive: false, zIndexOffset: -100 }).addTo(map);
+  }
+
+  // ============================================================
+  // STEP 7 — Geolocation
+  // ============================================================
+  function getPos() {
+    return new Promise(function (resolve, reject) {
+      if (!navigator.geolocation) return reject(new Error('not-supported'));
+      navigator.geolocation.getCurrentPosition(resolve, reject, {
+        enableHighAccuracy: true, timeout: 8000, maximumAge: 30000
+      });
+    });
+  }
+
+  document.getElementById('locate-btn').addEventListener('click', function () {
+    toast('Standort wird ermittelt…', 1200);
+    getPos().then(function (pos) {
+      var lat = pos.coords.latitude, lng = pos.coords.longitude;
+      showUserDot(lat, lng);
+      map.setView([lat, lng], 16, { animate: true });
+    }).catch(function (err) {
+      console.warn('Geo error:', err);
+      toast('Standort nicht verfügbar');
+    });
+  });
+
+  // ============================================================
+  // STEP 8 — Notifications
+  // ============================================================
+  var notifyBtn = document.getElementById('notify-btn');
+
+  function refreshNotifyBtn() {
+    if (!('Notification' in window)) { notifyBtn.disabled = true; return; }
+    if (Notification.permission === 'granted') notifyBtn.classList.add('active');
+    else notifyBtn.classList.remove('active');
+  }
+  refreshNotifyBtn();
+
+  notifyBtn.addEventListener('click', function () {
+    if (!('Notification' in window)) { toast('Nicht unterstützt'); return; }
+    if (Notification.permission === 'granted') { toast('Benachrichtigungen aktiv'); return; }
+    if (Notification.permission === 'denied') { toast('In Browser-Einstellungen erlauben'); return; }
+    Notification.requestPermission().then(function (result) {
+      refreshNotifyBtn();
+      if (result === 'granted') {
+        toast('Benachrichtigungen aktiviert ✓');
+        try { new Notification('Polizei Radar', { body: 'Du wirst bei neuen Meldungen benachrichtigt.', icon: policeIcon }); } catch (e) {}
+      } else {
+        toast('Nicht aktiviert');
       }
-      return id;
-    }
+    }).catch(function () { toast('Fehler beim Aktivieren'); });
+  });
 
-    // ============ ICON ============
-    const policeIcon = 'data:image/svg+xml;base64,' + btoa(
-      `<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64"><rect width="64" height="64" rx="14" fill="#2563eb"/><text x="32" y="44" text-anchor="middle" font-size="36">🚔</text></svg>`
-    );
+  // ============================================================
+  // STEP 9 — Hint (hide after first report)
+  // ============================================================
+  var hintEl = document.getElementById('hint');
+  if (localStorage.getItem('polizei_has_reported') === 'true') hintEl.classList.add('hidden');
+  function hideHint() {
+    hintEl.classList.add('hidden');
+    localStorage.setItem('polizei_has_reported', 'true');
+  }
 
-    // ============ MAP ============
-    const map = L.map('map', {
-      zoomControl: false,
-      attributionControl: true
-    }).setView(HORNSTEIN, DEFAULT_ZOOM);
+  // ============================================================
+  // STEP 10 — Add report
+  // ============================================================
+  function addReport(lat, lng) {
+    if (!reportsRef) { toast('Datenbank nicht verfügbar'); return Promise.resolve(false); }
+    return reportsRef.add({
+      lat: lat,
+      lng: lng,
+      time: firebase.firestore.FieldValue.serverTimestamp(),
+      clientId: getClientId(),
+      confirmations: 1
+    }).then(function () {
+      hideHint();
+      if (navigator.vibrate) navigator.vibrate(30);
+      toast('Meldung hinzugefügt');
+      return true;
+    }).catch(function (err) {
+      console.error('addReport:', err);
+      toast('Konnte nicht speichern');
+      return false;
+    });
+  }
 
-    L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      attribution: '&copy; OpenStreetMap',
-      maxZoom: 19
-    }).addTo(map);
+  map.on('click', function (e) {
+    if (document.getElementById('sheet').classList.contains('open')) return;
+    addReport(e.latlng.lat, e.latlng.lng);
+  });
 
-    // ============ USER LOCATION DOT ============
-    let userMarker = null;
-    const userDotIcon = L.divIcon({
-      html: '<div class="user-dot"><div class="user-dot-inner"></div></div>',
+  document.getElementById('report-btn').addEventListener('click', function () {
+    toast('Position wird ermittelt…', 1200);
+    getPos().then(function (pos) {
+      var lat = pos.coords.latitude, lng = pos.coords.longitude;
+      showUserDot(lat, lng);
+      map.setView([lat, lng], 16, { animate: true });
+      addReport(lat, lng);
+    }).catch(function (err) {
+      console.warn('Geo error:', err);
+      toast('Standort nicht verfügbar');
+    });
+  });
+
+  // ============================================================
+  // STEP 11 — Bottom sheet
+  // ============================================================
+  var sheetEl = document.getElementById('sheet');
+  var backdropEl = document.getElementById('backdrop');
+  var sheetMeta = document.getElementById('sheet-meta');
+  var currentId = null;
+
+  function openSheet(id, timestamp, confirmations) {
+    currentId = id;
+    var extra = (confirmations > 0) ? ' · ' + confirmations + '× bestätigt' : '';
+    sheetMeta.textContent = timeAgo(timestamp) + extra;
+    sheetEl.classList.add('open');
+    backdropEl.classList.add('open');
+  }
+  function closeSheet() {
+    sheetEl.classList.remove('open');
+    backdropEl.classList.remove('open');
+    currentId = null;
+  }
+  backdropEl.addEventListener('click', closeSheet);
+  document.addEventListener('keydown', function (e) { if (e.key === 'Escape') closeSheet(); });
+
+  document.getElementById('sheet-confirm').addEventListener('click', function () {
+    if (!currentId || !reportsRef) return;
+    var id = currentId;
+    closeSheet();
+    reportsRef.doc(id).update({
+      time: firebase.firestore.FieldValue.serverTimestamp(),
+      confirmations: firebase.firestore.FieldValue.increment(1)
+    }).then(function () {
+      toast('Bestätigt ✓');
+      if (navigator.vibrate) navigator.vibrate(20);
+    }).catch(function (err) {
+      console.error('confirm:', err);
+      toast('Konnte nicht bestätigen');
+    });
+  });
+
+  document.getElementById('sheet-delete').addEventListener('click', function () {
+    if (!currentId || !reportsRef) return;
+    var id = currentId;
+    if (!confirm('Diese Meldung entfernen?')) return;
+    closeSheet();
+    reportsRef.doc(id).delete().then(function () {
+      toast('Meldung entfernt');
+      if (navigator.vibrate) navigator.vibrate(20);
+    }).catch(function (err) {
+      console.error('delete:', err);
+      toast('Konnte nicht entfernen');
+    });
+  });
+
+  // ============================================================
+  // STEP 12 — Time helpers
+  // ============================================================
+  function toDate(t) {
+    if (!t) return null;
+    if (t.toDate) return t.toDate();
+    if (t instanceof Date) return t;
+    if (typeof t === 'number') return new Date(t);
+    return null;
+  }
+  function timeAgo(t) {
+    var d = toDate(t);
+    if (!d) return 'gerade eben';
+    var s = Math.floor((Date.now() - d.getTime()) / 1000);
+    if (s < 60) return 'gerade eben';
+    var m = Math.floor(s / 60);
+    if (m < 60) return 'vor ' + m + ' Min.';
+    var h = Math.floor(m / 60);
+    return 'vor ' + h + ' Std.';
+  }
+  function ageMin(t) {
+    var d = toDate(t);
+    if (!d) return 0;
+    return (Date.now() - d.getTime()) / 60000;
+  }
+
+  // ============================================================
+  // STEP 13 — Markers
+  // ============================================================
+  var markers = {}; // id -> { marker, data }
+
+  function makeMarker(lat, lng, id, timestamp, confirmations) {
+    var isOld = ageMin(timestamp) > 20;
+    var icon = L.divIcon({
+      html: '<div class="marker-wrap ' + (isOld ? 'old' : '') + '">' +
+            '<div class="marker ' + (isOld ? 'old' : '') + '">🚔</div></div>',
       className: '',
-      iconSize: [26, 26],
-      iconAnchor: [13, 13]
+      iconSize: [44, 44],
+      iconAnchor: [22, 22]
     });
-
-    function showUserLocation(lat, lng) {
-      if (userMarker) {
-        userMarker.setLatLng([lat, lng]);
-      } else {
-        userMarker = L.marker([lat, lng], {
-          icon: userDotIcon,
-          interactive: false,
-          zIndexOffset: -100
-        }).addTo(map);
-      }
-    }
-
-    // ============ TOAST ============
-    let toastTimer;
-    function showToast(msg, duration = 2400) {
-      const el = document.getElementById('toast');
-      el.textContent = msg;
-      el.classList.add('show');
-      clearTimeout(toastTimer);
-      toastTimer = setTimeout(() => el.classList.remove('show'), duration);
-    }
-
-    // ============ GEOLOCATION ============
-    function getUserPosition() {
-      return new Promise((resolve, reject) => {
-        if (!navigator.geolocation) {
-          reject(new Error('not-supported'));
-          return;
-        }
-        navigator.geolocation.getCurrentPosition(resolve, reject, {
-          enableHighAccuracy: true,
-          timeout: 8000,
-          maximumAge: 30000
-        });
-      });
-    }
-
-    document.getElementById('locate-btn').addEventListener('click', async () => {
-      showToast('Standort wird ermittelt…', 1200);
-      try {
-        const pos = await getUserPosition();
-        const lat = pos.coords.latitude;
-        const lng = pos.coords.longitude;
-        showUserLocation(lat, lng);
-        map.setView([lat, lng], 16, { animate: true });
-      } catch (err) {
-        console.warn('Geolocation error:', err.message);
-        showToast('Standort nicht verfügbar');
-      }
+    var m = L.marker([lat, lng], { icon: icon });
+    m.on('click', function (e) {
+      L.DomEvent.stopPropagation(e);
+      openSheet(id, timestamp, confirmations);
     });
+    return m;
+  }
 
-    // ============ NOTIFICATIONS ============
-    function updateNotifyButton() {
-      const btn = document.getElementById('notify-btn');
-      const slash = document.getElementById('notify-slash');
-
-      if (!('Notification' in window)) {
-        btn.disabled = true;
-        return;
-      }
-
-      if (Notification.permission === 'granted') {
-        btn.classList.add('active');
-        slash.style.display = 'none';
-      } else {
-        btn.classList.remove('active');
-        slash.style.display = 'block';
-      }
+  function refreshMarkerStyle(marker, timestamp) {
+    var el = marker.getElement();
+    if (!el) return;
+    var isOld = ageMin(timestamp) > 20;
+    var wrap = el.querySelector('.marker-wrap');
+    var dot = el.querySelector('.marker');
+    if (wrap && dot) {
+      if (isOld) { wrap.classList.add('old'); dot.classList.add('old'); }
+      else { wrap.classList.remove('old'); dot.classList.remove('old'); }
     }
-    updateNotifyButton();
+  }
 
-    document.getElementById('notify-btn').addEventListener('click', async () => {
-      if (!('Notification' in window)) {
-        showToast('Nicht unterstützt');
-        return;
-      }
-      if (Notification.permission === 'granted') {
-        showToast('Benachrichtigungen aktiv');
-        return;
-      }
-      if (Notification.permission === 'denied') {
-        showToast('In Browser-Einstellungen erlauben');
-        return;
-      }
-      try {
-        const result = await Notification.requestPermission();
-        updateNotifyButton();
-        if (result === 'granted') {
-          showToast('Benachrichtigungen aktiviert ✓');
-          try {
-            new Notification('Polizei Radar', {
-              body: 'Du wirst bei neuen Meldungen benachrichtigt.',
-              icon: policeIcon
-            });
-          } catch (_) {}
-        } else {
-          showToast('Nicht aktiviert');
-        }
-      } catch (e) {
-        showToast('Fehler beim Aktivieren');
-      }
-    });
-
-    // ============ HINT ============
-    const hintEl = document.getElementById('hint');
-    function hideHint() {
-      hintEl.classList.add('hidden');
-      localStorage.setItem('polizei_has_reported', 'true');
+  // ============================================================
+  // STEP 14 — Live badge
+  // ============================================================
+  function updateBadge() {
+    var status = document.getElementById('status');
+    var text = document.getElementById('status-text');
+    var n = Object.keys(markers).length;
+    if (n === 0) {
+      status.classList.remove('live');
+      text.textContent = 'Bereit';
+    } else {
+      status.classList.add('live');
+      text.textContent = n === 1 ? '1 aktiv' : n + ' aktiv';
     }
-    if (localStorage.getItem('polizei_has_reported') === 'true') hideHint();
+  }
 
-    // ============ ADD REPORT ============
-    async function addReport(lat, lng) {
-      try {
-        await addDoc(reportsRef, {
-          lat, lng,
-          time: serverTimestamp(),
-          clientId: getClientId(),
-          confirmations: 1
-        });
-        hideHint();
-        if (navigator.vibrate) navigator.vibrate(35);
-        showToast('Meldung hinzugefügt');
-        return true;
-      } catch (err) {
-        console.error(err);
-        showToast('Konnte nicht speichern');
-        return false;
-      }
-    }
+  // ============================================================
+  // STEP 15 — Cleanup old reports
+  // ============================================================
+  function cleanup() {
+    if (!reportsRef) return;
+    var cutoff = new Date(Date.now() - 90 * 60 * 1000);
+    reportsRef.where('time', '<', cutoff).get().then(function (snap) {
+      snap.forEach(function (doc) { doc.ref.delete().catch(function () {}); });
+    }).catch(function (e) { console.warn('cleanup:', e.message); });
+  }
 
-    // Tap map to report
-    map.on('click', (e) => {
-      // ignore if sheet is open
-      if (document.getElementById('sheet').classList.contains('open')) return;
-      addReport(e.latlng.lat, e.latlng.lng);
-    });
+  // ============================================================
+  // STEP 16 — Real-time listener
+  // ============================================================
+  if (reportsRef) {
+    var isInitial = true;
+    reportsRef.onSnapshot(function (snapshot) {
+      snapshot.docChanges().forEach(function (change) {
+        var id = change.doc.id;
+        var data = change.doc.data();
 
-    // FAB: report at my location
-    document.getElementById('report-btn').addEventListener('click', async () => {
-      showToast('Position wird ermittelt…', 1200);
-      try {
-        const pos = await getUserPosition();
-        const lat = pos.coords.latitude;
-        const lng = pos.coords.longitude;
-        showUserLocation(lat, lng);
-        map.setView([lat, lng], 16, { animate: true });
-        await addReport(lat, lng);
-      } catch (err) {
-        console.warn('Geolocation error:', err.message);
-        showToast('Standort nicht verfügbar');
-      }
-    });
-
-    // ============ BOTTOM SHEET ============
-    let currentSheetId = null;
-    const sheetEl = document.getElementById('sheet');
-    const backdropEl = document.getElementById('sheet-backdrop');
-
-    function openSheet(docId, timestamp, confirmations) {
-      currentSheetId = docId;
-      const countText = confirmations > 0 ? ` · ${confirmations}× bestätigt` : '';
-      document.getElementById('sheet-meta').textContent = `${timeAgo(timestamp)}${countText}`;
-      sheetEl.classList.add('open');
-      backdropEl.classList.add('open');
-    }
-
-    function closeSheet() {
-      sheetEl.classList.remove('open');
-      backdropEl.classList.remove('open');
-      currentSheetId = null;
-    }
-
-    backdropEl.addEventListener('click', closeSheet);
-
-    // Confirm "Noch da"
-    document.getElementById('sheet-confirm').addEventListener('click', async () => {
-      if (!currentSheetId) return;
-      const id = currentSheetId;
-      closeSheet();
-      try {
-        await updateDoc(doc(db, 'reports', id), {
-          time: serverTimestamp(),
-          confirmations: increment(1)
-        });
-        showToast('Bestätigt ✓');
-        if (navigator.vibrate) navigator.vibrate(20);
-      } catch (err) {
-        console.error(err);
-        showToast('Konnte nicht bestätigen');
-      }
-    });
-
-    // Delete
-    document.getElementById('sheet-delete').addEventListener('click', async () => {
-      if (!currentSheetId) return;
-      const id = currentSheetId;
-      if (!confirm('Diese Meldung entfernen?')) return;
-      closeSheet();
-      try {
-        await deleteDoc(doc(db, 'reports', id));
-        showToast('Meldung entfernt');
-        if (navigator.vibrate) navigator.vibrate(20);
-      } catch (err) {
-        console.error(err);
-        showToast('Konnte nicht entfernen');
-      }
-    });
-
-    // ============ TIME HELPERS ============
-    function toDate(t) {
-      if (!t) return null;
-      if (t.toDate) return t.toDate();
-      if (t instanceof Date) return t;
-      if (typeof t === 'number') return new Date(t);
-      return null;
-    }
-
-    function timeAgo(t) {
-      const d = toDate(t);
-      if (!d) return 'gerade eben';
-      const s = Math.floor((Date.now() - d.getTime()) / 1000);
-      if (s < 60) return 'gerade eben';
-      const m = Math.floor(s / 60);
-      if (m < 60) return `vor ${m} Min.`;
-      const h = Math.floor(m / 60);
-      return `vor ${h} Std.`;
-    }
-
-    function ageMinutes(t) {
-      const d = toDate(t);
-      if (!d) return 0;
-      return (Date.now() - d.getTime()) / 60000;
-    }
-
-    // ============ MARKERS ============
-    const markers = new Map();
-
-    function makeMarker(lat, lng, docId, timestamp, confirmations) {
-      const isOld = ageMinutes(timestamp) > REPORT_OLD_AFTER_MIN;
-      const icon = L.divIcon({
-        html: `<div class="police-marker-wrap ${isOld ? 'old' : ''}">
-                 <div class="police-marker ${isOld ? 'old' : ''}">🚔</div>
-               </div>`,
-        className: '',
-        iconSize: [44, 44],
-        iconAnchor: [22, 22]
-      });
-
-      const marker = L.marker([lat, lng], { icon });
-      marker.on('click', (e) => {
-        L.DomEvent.stopPropagation(e);
-        openSheet(docId, timestamp, confirmations);
-      });
-      return marker;
-    }
-
-    function updateMarkerStyle(marker, timestamp) {
-      const isOld = ageMinutes(timestamp) > REPORT_OLD_AFTER_MIN;
-      const el = marker.getElement();
-      if (!el) return;
-      const wrap = el.querySelector('.police-marker-wrap');
-      const dot = el.querySelector('.police-marker');
-      if (wrap && dot) {
-        wrap.classList.toggle('old', isOld);
-        dot.classList.toggle('old', isOld);
-      }
-    }
-
-    // ============ LIVE BADGE ============
-    function updateLiveBadge() {
-      const badge = document.getElementById('live-badge');
-      const text = document.getElementById('live-text');
-      const n = markers.size;
-      if (n === 0) {
-        text.textContent = 'Bereit';
-        badge.classList.remove('active');
-      } else {
-        text.textContent = n === 1 ? '1 Meldung aktiv' : `${n} aktiv`;
-        badge.classList.add('active');
-      }
-    }
-
-    // ============ CLEANUP ============
-    async function cleanupOldReports() {
-      try {
-        const cutoff = new Date(Date.now() - REPORT_MAX_AGE_MIN * 60 * 1000);
-        const q = query(reportsRef, where('time', '<', cutoff));
-        const snap = await getDocs(q);
-        for (const d of snap.docs) {
-          try { await deleteDoc(d.ref); } catch (_) {}
-        }
-      } catch (e) {
-        console.warn('Cleanup failed:', e.message);
-      }
-    }
-
-    // ============ FIRESTORE LISTENER ============
-    let isInitialLoad = true;
-
-    onSnapshot(reportsRef, (snapshot) => {
-      snapshot.docChanges().forEach((change) => {
-        const id = change.doc.id;
-        const data = change.doc.data();
-
-        // Updated (e.g. "Noch da")
         if (change.type === 'modified') {
-          const entry = markers.get(id);
+          var entry = markers[id];
           if (entry) {
             entry.data = data;
-            updateMarkerStyle(entry.marker, data.time);
-            if (currentSheetId === id) {
-              const countText = data.confirmations > 0 ? ` · ${data.confirmations}× bestätigt` : '';
-              document.getElementById('sheet-meta').textContent =
-                `${timeAgo(data.time)}${countText}`;
+            refreshMarkerStyle(entry.marker, data.time);
+            if (currentId === id) {
+              var extra = (data.confirmations > 0) ? ' · ' + data.confirmations + '× bestätigt' : '';
+              sheetMeta.textContent = timeAgo(data.time) + extra;
             }
           }
           return;
         }
 
-        // Added
         if (change.type === 'added') {
-          if (ageMinutes(data.time) > REPORT_MAX_AGE_MIN) {
-            deleteDoc(change.doc.ref).catch(() => {});
+          if (ageMin(data.time) > 90) {
+            change.doc.ref.delete().catch(function () {});
             return;
           }
-          const confirmations = data.confirmations || 0;
-          const marker = makeMarker(
-            data.lat, data.lng, id, data.time, confirmations
-          ).addTo(map);
-          markers.set(id, { marker, data });
+          var confirmations = data.confirmations || 0;
+          var marker = makeMarker(data.lat, data.lng, id, data.time, confirmations).addTo(map);
+          markers[id] = { marker: marker, data: data };
 
-          if (!isInitialLoad && 'Notification' in window && Notification.permission === 'granted') {
-            const isMine = data.clientId === getClientId();
-            const recentlyAdded = ageMinutes(data.time) < 1;
-            if (!isMine && recentlyAdded) {
+          if (!isInitial && 'Notification' in window && Notification.permission === 'granted') {
+            var isMine = data.clientId === getClientId();
+            var recent = ageMin(data.time) < 1;
+            if (!isMine && recent) {
               try {
                 new Notification('🚔 Polizei gemeldet', {
                   body: 'In deiner Nähe wurde eine Polizei gemeldet.',
-                  icon: policeIcon,
-                  tag: 'police-new',
-                  renotify: true
+                  icon: policeIcon
                 });
               } catch (e) {}
             }
           }
         }
 
-        // Removed
         if (change.type === 'removed') {
-          const entry = markers.get(id);
+          var entry = markers[id];
           if (entry) {
             map.removeLayer(entry.marker);
-            markers.delete(id);
+            delete markers[id];
           }
-          if (currentSheetId === id) closeSheet();
+          if (currentId === id) closeSheet();
         }
       });
-
-      updateLiveBadge();
-      isInitialLoad = false;
-    }, (err) => {
-      console.error('Snapshot error:', err);
-      showToast('Verbindungsfehler');
+      updateBadge();
+      isInitial = false;
+    }, function (err) {
+      console.error('snapshot error:', err);
+      showError('Datenbank-Fehler: ' + err.message + ' — prüfe Firestore-Regeln.');
     });
 
-    // ============ STARTUP ============
-    cleanupOldReports();
-    setInterval(cleanupOldReports, 10 * 60 * 1000);
+    cleanup();
+    setInterval(cleanup, 10 * 60 * 1000);
 
-    // Refresh "old" styling every minute
-    setInterval(() => {
-      markers.forEach(({ marker, data }) => {
-        updateMarkerStyle(marker, data.time);
+    setInterval(function () {
+      Object.keys(markers).forEach(function (id) {
+        refreshMarkerStyle(markers[id].marker, markers[id].data.time);
       });
     }, 60 * 1000);
-
-    // Escape closes sheet
-    document.addEventListener('keydown', (e) => {
-      if (e.key === 'Escape') closeSheet();
-    });
-  </script>
+  }
+})();
+</script>
 </body>
 </html>
