@@ -8,136 +8,215 @@
   <meta name="theme-color" content="#0f172a" />
   <link rel="icon" href="data:," />
   <title>Polizei Radar</title>
+
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 
   <style>
     :root {
-      --bg: #ffffff;
+      --bg: #f5f7fa;
+      --surface: #ffffff;
+      --surface-elevated: rgba(255, 255, 255, 0.92);
       --text: #0f172a;
-      --text-muted: #64748b;
+      --text-secondary: #64748b;
+      --text-tertiary: #94a3b8;
+      --border: rgba(0, 0, 0, 0.06);
       --accent: #2563eb;
+      --accent-soft: rgba(37, 99, 235, 0.12);
       --danger: #ef4444;
-      --success: #22c55e;
-      --glass: rgba(255, 255, 255, 0.85);
-      --glass-border: rgba(0, 0, 0, 0.06);
-      --shadow: 0 8px 32px rgba(0, 0, 0, 0.12);
+      --danger-soft: rgba(239, 68, 68, 0.12);
+      --success: #10b981;
+      --success-soft: rgba(16, 185, 129, 0.12);
+      --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.06);
+      --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.08);
+      --shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.12);
+      --shadow-xl: 0 24px 48px rgba(0, 0, 0, 0.18);
       --safe-top: env(safe-area-inset-top, 0px);
       --safe-bottom: env(safe-area-inset-bottom, 0px);
+      --radius-sm: 12px;
+      --radius-md: 16px;
+      --radius-lg: 20px;
+      --radius-xl: 28px;
     }
 
     @media (prefers-color-scheme: dark) {
       :root {
-        --bg: #0f172a;
+        --bg: #0b1220;
+        --surface: #1e293b;
+        --surface-elevated: rgba(30, 41, 59, 0.92);
         --text: #f1f5f9;
-        --text-muted: #94a3b8;
-        --glass: rgba(15, 23, 42, 0.85);
-        --glass-border: rgba(255, 255, 255, 0.08);
-        --shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+        --text-secondary: #94a3b8;
+        --text-tertiary: #64748b;
+        --border: rgba(255, 255, 255, 0.08);
+        --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.3);
+        --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.4);
+        --shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.5);
+        --shadow-xl: 0 24px 48px rgba(0, 0, 0, 0.6);
       }
     }
 
     * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
-    html, body { height: 100%; overflow: hidden; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif; background: var(--bg); color: var(--text); }
-    button { font-family: inherit; touch-action: manipulation; }
+    html, body { height: 100%; overflow: hidden; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif; background: var(--bg); color: var(--text); -webkit-font-smoothing: antialiased; }
+    button { font-family: inherit; touch-action: manipulation; border: none; background: none; color: inherit; cursor: pointer; }
 
-    #map { position: fixed; inset: 0; z-index: 0; background: var(--bg); }
+    #map { position: fixed; inset: 0; z-index: 0; }
 
-    /* Top status pill */
-    #top-bar {
+    /* ============ HEADER ============ */
+    #app-header {
       position: fixed;
-      top: calc(12px + var(--safe-top));
-      left: 0; right: 0;
-      display: flex;
-      justify-content: center;
+      top: 0; left: 0; right: 0;
+      padding: calc(10px + var(--safe-top)) 16px 10px;
       z-index: 1000;
       pointer-events: none;
     }
 
-    #status-pill {
-      background: var(--glass);
-      backdrop-filter: blur(20px);
-      -webkit-backdrop-filter: blur(20px);
-      border: 1px solid var(--glass-border);
-      padding: 8px 16px;
-      border-radius: 100px;
-      font-size: 14px;
-      font-weight: 600;
-      box-shadow: var(--shadow);
+    .header-inner {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    .brand {
       display: flex;
       align-items: center;
       gap: 8px;
+      background: var(--surface-elevated);
+      backdrop-filter: blur(24px) saturate(180%);
+      -webkit-backdrop-filter: blur(24px) saturate(180%);
+      border: 1px solid var(--border);
+      padding: 10px 14px;
+      border-radius: var(--radius-xl);
+      box-shadow: var(--shadow-md);
+      pointer-events: auto;
     }
 
-    #status-pill::before {
-      content: '';
+    .brand-icon { font-size: 18px; line-height: 1; }
+    .brand-name { font-size: 15px; font-weight: 700; letter-spacing: -0.02em; }
+
+    #live-badge {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: var(--surface-elevated);
+      backdrop-filter: blur(24px) saturate(180%);
+      -webkit-backdrop-filter: blur(24px) saturate(180%);
+      border: 1px solid var(--border);
+      padding: 10px 14px;
+      border-radius: var(--radius-xl);
+      box-shadow: var(--shadow-md);
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text-secondary);
+      pointer-events: auto;
+    }
+
+    .live-dot {
       width: 8px; height: 8px;
       border-radius: 50%;
+      background: var(--success);
+      box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.5);
+      animation: pulseDot 2s infinite;
+      flex-shrink: 0;
+    }
+
+    #live-badge.active .live-dot {
       background: var(--danger);
       box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.5);
-      animation: dotPulse 2s infinite;
+      animation: pulseDot 2s infinite;
     }
 
-    #status-pill.empty::before { background: var(--text-muted); animation: none; box-shadow: none; }
-
-    @keyframes dotPulse {
-      0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.5); }
-      70% { box-shadow: 0 0 0 8px rgba(239, 68, 68, 0); }
-      100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+    #live-badge.active {
+      color: var(--danger);
     }
 
-    /* Bottom toolbar */
-    #bottom-bar {
+    @keyframes pulseDot {
+      0% { box-shadow: 0 0 0 0 currentColor; }
+      70% { box-shadow: 0 0 0 8px transparent; }
+      100% { box-shadow: 0 0 0 0 transparent; }
+    }
+
+    /* ============ TOOLBAR ============ */
+    #toolbar {
       position: fixed;
-      bottom: calc(20px + var(--safe-bottom));
-      left: 0; right: 0;
+      bottom: 0; left: 0; right: 0;
+      padding: 16px 24px calc(16px + var(--safe-bottom));
+      z-index: 1000;
       display: flex;
       justify-content: center;
-      gap: 12px;
-      z-index: 1000;
+      align-items: center;
+      gap: 20px;
       pointer-events: none;
     }
 
-    .tool-btn {
+    .circle-btn {
       pointer-events: auto;
-      width: 56px; height: 56px;
+      width: 52px; height: 52px;
       border-radius: 50%;
-      border: 1px solid var(--glass-border);
-      background: var(--glass);
-      backdrop-filter: blur(20px);
-      -webkit-backdrop-filter: blur(20px);
-      box-shadow: var(--shadow);
-      font-size: 22px;
-      cursor: pointer;
+      background: var(--surface-elevated);
+      backdrop-filter: blur(24px) saturate(180%);
+      -webkit-backdrop-filter: blur(24px) saturate(180%);
+      border: 1px solid var(--border);
+      box-shadow: var(--shadow-md);
       display: flex;
       align-items: center;
       justify-content: center;
       transition: transform 0.15s ease, background 0.2s ease;
+      color: var(--text);
     }
 
-    .tool-btn:active { transform: scale(0.92); }
+    .circle-btn:active { transform: scale(0.9); }
 
-    .tool-btn.active {
+    .circle-btn.active {
       background: var(--accent);
+      color: white;
       border-color: var(--accent);
     }
 
-    /* Hint */
+    .circle-btn svg {
+      width: 22px;
+      height: 22px;
+    }
+
+    .fab {
+      pointer-events: auto;
+      width: 64px; height: 64px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #3b82f6, #2563eb);
+      box-shadow: 0 8px 24px rgba(37, 99, 235, 0.45), 0 2px 6px rgba(37, 99, 235, 0.3);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      transition: transform 0.15s ease, box-shadow 0.2s ease;
+    }
+
+    .fab:active {
+      transform: scale(0.9);
+      box-shadow: 0 4px 12px rgba(37, 99, 235, 0.4);
+    }
+
+    .fab svg {
+      width: 28px;
+      height: 28px;
+    }
+
+    /* ============ HINT ============ */
     #hint {
       position: fixed;
       bottom: calc(96px + var(--safe-bottom));
       left: 50%;
       transform: translateX(-50%);
-      background: var(--glass);
-      backdrop-filter: blur(20px);
-      -webkit-backdrop-filter: blur(20px);
-      border: 1px solid var(--glass-border);
+      background: var(--surface-elevated);
+      backdrop-filter: blur(24px) saturate(180%);
+      -webkit-backdrop-filter: blur(24px) saturate(180%);
+      border: 1px solid var(--border);
       padding: 10px 18px;
-      border-radius: 100px;
+      border-radius: var(--radius-xl);
       font-size: 13px;
       font-weight: 500;
-      color: var(--text-muted);
-      box-shadow: var(--shadow);
-      z-index: 1000;
+      color: var(--text-secondary);
+      box-shadow: var(--shadow-md);
+      z-index: 900;
       pointer-events: none;
       white-space: nowrap;
       transition: opacity 0.4s ease, transform 0.4s ease;
@@ -145,23 +224,23 @@
 
     #hint.hidden {
       opacity: 0;
-      transform: translateX(-50%) translateY(10px);
+      transform: translateX(-50%) translateY(12px);
     }
 
-    /* Toast */
+    /* ============ TOAST ============ */
     #toast {
       position: fixed;
-      top: calc(64px + var(--safe-top));
+      top: calc(80px + var(--safe-top));
       left: 50%;
-      transform: translateX(-50%) translateY(-20px);
+      transform: translateX(-50%) translateY(-16px);
       background: var(--text);
       color: var(--bg);
       padding: 12px 20px;
-      border-radius: 12px;
+      border-radius: var(--radius-md);
       font-size: 14px;
-      font-weight: 500;
-      box-shadow: var(--shadow);
-      z-index: 2000;
+      font-weight: 600;
+      box-shadow: var(--shadow-xl);
+      z-index: 3000;
       opacity: 0;
       pointer-events: none;
       transition: opacity 0.25s ease, transform 0.25s ease;
@@ -174,20 +253,33 @@
       transform: translateX(-50%) translateY(0);
     }
 
-    /* Remove default Leaflet div-icon box */
+    /* ============ MARKERS ============ */
     .leaflet-div-icon {
       background: transparent !important;
       border: none !important;
     }
 
-    /* Police marker */
     .police-marker-wrap {
       position: relative;
-      width: 40px; height: 40px;
+      width: 44px;
+      height: 44px;
     }
 
+    .police-marker-wrap::before {
+      content: '';
+      position: absolute;
+      inset: -6px;
+      border-radius: 50%;
+      background: rgba(239, 68, 68, 0.35);
+      animation: markerPulse 2s infinite;
+      z-index: 1;
+    }
+
+    .police-marker-wrap.old::before { display: none; }
+
     .police-marker {
-      width: 40px; height: 40px;
+      position: relative;
+      width: 44px; height: 44px;
       border-radius: 50%;
       background: linear-gradient(135deg, #ef4444, #dc2626);
       display: flex;
@@ -195,133 +287,228 @@
       justify-content: center;
       font-size: 20px;
       box-shadow: 0 4px 16px rgba(239, 68, 68, 0.45), 0 0 0 3px white;
-      position: relative;
       z-index: 2;
+      transition: transform 0.15s ease;
     }
 
     .police-marker.old {
       background: linear-gradient(135deg, #94a3b8, #64748b);
       box-shadow: 0 4px 12px rgba(100, 116, 139, 0.3), 0 0 0 3px white;
-      opacity: 0.75;
+      opacity: 0.7;
     }
-
-    .police-marker-wrap::before {
-      content: '';
-      position: absolute;
-      inset: -8px;
-      border-radius: 50%;
-      background: rgba(239, 68, 68, 0.3);
-      animation: markerPulse 2s infinite;
-      z-index: 1;
-    }
-
-    .police-marker-wrap.old::before { display: none; }
 
     @keyframes markerPulse {
       0% { transform: scale(1); opacity: 0.6; }
-      100% { transform: scale(1.8); opacity: 0; }
+      100% { transform: scale(1.7); opacity: 0; }
     }
 
-    /* Modern popup */
-    .leaflet-popup-content-wrapper {
-      background: transparent !important;
-      box-shadow: none !important;
-      padding: 0 !important;
-      border-radius: 0 !important;
-    }
-    .leaflet-popup-content {
-      margin: 0 !important;
-      padding: 0 !important;
-      width: auto !important;
-    }
-    .leaflet-popup-tip {
-      background: var(--glass) !important;
-      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15) !important;
-    }
-    .leaflet-popup { margin-bottom: 20px; }
-
-    .popup {
-      background: var(--glass);
-      backdrop-filter: blur(20px);
-      -webkit-backdrop-filter: blur(20px);
-      border: 1px solid var(--glass-border);
-      border-radius: 16px;
-      padding: 14px 16px;
-      min-width: 200px;
-      box-shadow: var(--shadow);
-      font-family: inherit;
+    /* User location dot */
+    .user-dot {
+      width: 26px; height: 26px;
+      position: relative;
     }
 
-    .popup-title {
+    .user-dot::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      border-radius: 50%;
+      background: rgba(37, 99, 235, 0.25);
+      animation: userPulse 2s infinite;
+    }
+
+    .user-dot-inner {
+      position: absolute;
+      inset: 7px;
+      border-radius: 50%;
+      background: #2563eb;
+      border: 2px solid white;
+      box-shadow: 0 0 12px rgba(37, 99, 235, 0.6);
+    }
+
+    @keyframes userPulse {
+      0% { transform: scale(1); opacity: 0.7; }
+      100% { transform: scale(2); opacity: 0; }
+    }
+
+    /* ============ BOTTOM SHEET ============ */
+    #sheet-backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.3);
+      backdrop-filter: blur(2px);
+      -webkit-backdrop-filter: blur(2px);
+      z-index: 1500;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.28s ease;
+    }
+
+    #sheet-backdrop.open {
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    #sheet {
+      position: fixed;
+      bottom: 0; left: 0; right: 0;
+      z-index: 1600;
+      background: var(--surface);
+      border-radius: var(--radius-xl) var(--radius-xl) 0 0;
+      box-shadow: var(--shadow-xl);
+      transform: translateY(100%);
+      transition: transform 0.32s cubic-bezier(0.22, 1, 0.36, 1);
+      padding: 10px 20px calc(24px + var(--safe-bottom));
+      max-width: 500px;
+      margin: 0 auto;
+    }
+
+    #sheet.open {
+      transform: translateY(0);
+    }
+
+    .sheet-handle {
+      width: 40px; height: 4px;
+      background: var(--border);
+      border-radius: 2px;
+      margin: 4px auto 20px;
+    }
+
+    .sheet-header {
       display: flex;
       align-items: center;
-      gap: 8px;
-      font-size: 15px;
+      gap: 14px;
+      margin-bottom: 20px;
+    }
+
+    .sheet-icon {
+      width: 52px; height: 52px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #ef4444, #dc2626);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 24px;
+      box-shadow: 0 4px 16px rgba(239, 68, 68, 0.35);
+      flex-shrink: 0;
+    }
+
+    .sheet-info { flex: 1; min-width: 0; }
+
+    .sheet-title {
+      font-size: 17px;
       font-weight: 700;
       color: var(--text);
-      margin-bottom: 4px;
+      margin-bottom: 3px;
+      letter-spacing: -0.02em;
     }
 
-    .popup-age {
+    .sheet-meta {
       font-size: 13px;
-      color: var(--text-muted);
-      margin-bottom: 12px;
+      color: var(--text-secondary);
+      font-weight: 500;
     }
 
-    .popup-confirm {
-      width: 100%;
-      padding: 10px;
-      margin-bottom: 8px;
-      border-radius: 10px;
-      border: none;
+    .sheet-actions {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+
+    .btn-confirm, .btn-delete {
+      padding: 14px;
+      border-radius: var(--radius-md);
+      font-size: 15px;
+      font-weight: 700;
+      transition: opacity 0.15s ease, transform 0.15s ease;
+      letter-spacing: -0.01em;
+    }
+
+    .btn-confirm {
       background: var(--success);
       color: white;
-      font-weight: 600;
-      font-size: 14px;
-      cursor: pointer;
-      transition: opacity 0.15s ease;
+      box-shadow: 0 4px 12px rgba(16, 185, 129, 0.25);
     }
 
-    .popup-confirm:active { opacity: 0.7; }
-
-    .popup-clear {
-      width: 100%;
-      padding: 10px;
-      border-radius: 10px;
-      border: none;
-      background: var(--danger);
-      color: white;
-      font-weight: 600;
-      font-size: 14px;
-      cursor: pointer;
-      transition: opacity 0.15s ease;
+    .btn-delete {
+      background: var(--danger-soft);
+      color: var(--danger);
     }
 
-    .popup-clear:active { opacity: 0.7; }
+    .btn-confirm:active, .btn-delete:active {
+      opacity: 0.7;
+      transform: scale(0.97);
+    }
 
-    /* Leaflet attribution restyled */
+    /* Leaflet attribution */
     .leaflet-control-attribution {
-      background: var(--glass) !important;
+      background: var(--surface-elevated) !important;
       backdrop-filter: blur(10px);
       border-radius: 8px 0 0 0;
       font-size: 10px !important;
+      color: var(--text-tertiary) !important;
+    }
+
+    .leaflet-control-attribution a {
+      color: var(--text-secondary) !important;
     }
   </style>
 </head>
 <body>
-  <div id="map"></div>
+  <header id="app-header">
+    <div class="header-inner">
+      <div class="brand">
+        <span class="brand-icon">🚔</span>
+        <span class="brand-name">Polizei Radar</span>
+      </div>
+      <div id="live-badge" class="empty">
+        <span class="live-dot"></span>
+        <span id="live-text">Bereit</span>
+      </div>
+    </div>
+  </header>
 
-  <div id="top-bar">
-    <div id="status-pill" class="empty">Keine Meldungen</div>
-  </div>
+  <div id="map"></div>
 
   <div id="hint">Tippe auf die Karte, um Polizei zu melden</div>
 
-  <div id="bottom-bar">
-    <button id="locate-btn" class="tool-btn" aria-label="Eigene Position">📍</button>
-    <button id="notify-btn" class="tool-btn" aria-label="Benachrichtigungen">
-      <span id="notify-icon">🔕</span>
+  <nav id="toolbar">
+    <button id="locate-btn" class="circle-btn" aria-label="Mein Standort">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="12" cy="12" r="3"/>
+        <path d="M12 2v3M12 19v3M2 12h3M19 12h3"/>
+      </svg>
     </button>
+
+    <button id="report-btn" class="fab" aria-label="Polizei melden">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M12 5v14M5 12h14"/>
+      </svg>
+    </button>
+
+    <button id="notify-btn" class="circle-btn" aria-label="Benachrichtigungen">
+      <svg id="notify-icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
+        <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
+        <line id="notify-slash" x1="3" y1="3" x2="21" y2="21" stroke-width="2"/>
+      </svg>
+    </button>
+  </nav>
+
+  <div id="sheet-backdrop"></div>
+  <div id="sheet">
+    <div class="sheet-handle"></div>
+    <div class="sheet-header">
+      <div class="sheet-icon">🚔</div>
+      <div class="sheet-info">
+        <div class="sheet-title">Polizeikontrolle</div>
+        <div class="sheet-meta" id="sheet-meta">gerade eben</div>
+      </div>
+    </div>
+    <div class="sheet-actions">
+      <button id="sheet-confirm" class="btn-confirm">✓ Noch da</button>
+      <button id="sheet-delete" class="btn-delete">Entfernen</button>
+    </div>
   </div>
 
   <div id="toast"></div>
@@ -336,7 +523,7 @@
       onSnapshot, query, where, getDocs, serverTimestamp
     } from "https://www.gstatic.com/firebasejs/13.1.0/firebase-firestore.js";
 
-    // --- CONFIG ---
+    // ============ CONFIG ============
     const firebaseConfig = {
       apiKey: "AIzaSyCh4CiPSYJgrxMOZTWNt3oz2QOB2hovnVQ",
       authDomain: "polizei-radar.firebaseapp.com",
@@ -356,7 +543,7 @@
     const db = getFirestore(app);
     const reportsRef = collection(db, "reports");
 
-    // --- CLIENT ID ---
+    // ============ CLIENT ID ============
     function generateId() {
       if (window.crypto && crypto.randomUUID) {
         try { return crypto.randomUUID(); } catch (_) {}
@@ -375,25 +562,46 @@
       return id;
     }
 
-    // --- NOTIFICATION ICON ---
+    // ============ ICON ============
     const policeIcon = 'data:image/svg+xml;base64,' + btoa(
       `<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64"><rect width="64" height="64" rx="14" fill="#2563eb"/><text x="32" y="44" text-anchor="middle" font-size="36">🚔</text></svg>`
     );
 
-    // --- MAP ---
+    // ============ MAP ============
     const map = L.map('map', {
       zoomControl: false,
       attributionControl: true
     }).setView(HORNSTEIN, DEFAULT_ZOOM);
 
     L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      attribution: '&copy; OpenStreetMap contributors',
+      attribution: '&copy; OpenStreetMap',
       maxZoom: 19
     }).addTo(map);
 
-    // --- TOAST ---
+    // ============ USER LOCATION DOT ============
+    let userMarker = null;
+    const userDotIcon = L.divIcon({
+      html: '<div class="user-dot"><div class="user-dot-inner"></div></div>',
+      className: '',
+      iconSize: [26, 26],
+      iconAnchor: [13, 13]
+    });
+
+    function showUserLocation(lat, lng) {
+      if (userMarker) {
+        userMarker.setLatLng([lat, lng]);
+      } else {
+        userMarker = L.marker([lat, lng], {
+          icon: userDotIcon,
+          interactive: false,
+          zIndexOffset: -100
+        }).addTo(map);
+      }
+    }
+
+    // ============ TOAST ============
     let toastTimer;
-    function showToast(msg, duration = 2500) {
+    function showToast(msg, duration = 2400) {
       const el = document.getElementById('toast');
       el.textContent = msg;
       el.classList.add('show');
@@ -401,54 +609,66 @@
       toastTimer = setTimeout(() => el.classList.remove('show'), duration);
     }
 
-    // --- GEOLOCATION ---
-    function centerOnUser() {
-      if (!navigator.geolocation) {
-        showToast('Standort nicht verfügbar');
-        return;
-      }
-      showToast('Standort wird ermittelt…', 1500);
-      navigator.geolocation.getCurrentPosition(
-        (pos) => map.setView([pos.coords.latitude, pos.coords.longitude], 16),
-        (err) => {
-          console.warn('Geolocation error:', err.message);
-          showToast('Standort nicht verfügbar');
-        },
-        { enableHighAccuracy: true, timeout: 8000, maximumAge: 30000 }
-      );
+    // ============ GEOLOCATION ============
+    function getUserPosition() {
+      return new Promise((resolve, reject) => {
+        if (!navigator.geolocation) {
+          reject(new Error('not-supported'));
+          return;
+        }
+        navigator.geolocation.getCurrentPosition(resolve, reject, {
+          enableHighAccuracy: true,
+          timeout: 8000,
+          maximumAge: 30000
+        });
+      });
     }
-    document.getElementById('locate-btn').addEventListener('click', centerOnUser);
 
-    // --- NOTIFICATIONS ---
+    document.getElementById('locate-btn').addEventListener('click', async () => {
+      showToast('Standort wird ermittelt…', 1200);
+      try {
+        const pos = await getUserPosition();
+        const lat = pos.coords.latitude;
+        const lng = pos.coords.longitude;
+        showUserLocation(lat, lng);
+        map.setView([lat, lng], 16, { animate: true });
+      } catch (err) {
+        console.warn('Geolocation error:', err.message);
+        showToast('Standort nicht verfügbar');
+      }
+    });
+
+    // ============ NOTIFICATIONS ============
     function updateNotifyButton() {
-      const icon = document.getElementById('notify-icon');
       const btn = document.getElementById('notify-btn');
+      const slash = document.getElementById('notify-slash');
+
       if (!('Notification' in window)) {
-        icon.textContent = '🔕';
         btn.disabled = true;
         return;
       }
+
       if (Notification.permission === 'granted') {
-        icon.textContent = '🔔';
         btn.classList.add('active');
+        slash.style.display = 'none';
       } else {
-        icon.textContent = '🔕';
         btn.classList.remove('active');
+        slash.style.display = 'block';
       }
     }
     updateNotifyButton();
 
     document.getElementById('notify-btn').addEventListener('click', async () => {
       if (!('Notification' in window)) {
-        showToast('Benachrichtigungen nicht unterstützt');
+        showToast('Nicht unterstützt');
         return;
       }
       if (Notification.permission === 'granted') {
-        showToast('Benachrichtigungen sind aktiv');
+        showToast('Benachrichtigungen aktiv');
         return;
       }
       if (Notification.permission === 'denied') {
-        showToast('Blockiert – in den Browser-Einstellungen erlauben');
+        showToast('In Browser-Einstellungen erlauben');
         return;
       }
       try {
@@ -456,10 +676,12 @@
         updateNotifyButton();
         if (result === 'granted') {
           showToast('Benachrichtigungen aktiviert ✓');
-          new Notification('Polizei Radar', {
-            body: 'Du wirst ab jetzt bei neuen Meldungen benachrichtigt.',
-            icon: policeIcon
-          });
+          try {
+            new Notification('Polizei Radar', {
+              body: 'Du wirst bei neuen Meldungen benachrichtigt.',
+              icon: policeIcon
+            });
+          } catch (_) {}
         } else {
           showToast('Nicht aktiviert');
         }
@@ -468,7 +690,7 @@
       }
     });
 
-    // --- HINT ---
+    // ============ HINT ============
     const hintEl = document.getElementById('hint');
     function hideHint() {
       hintEl.classList.add('hidden');
@@ -476,29 +698,77 @@
     }
     if (localStorage.getItem('polizei_has_reported') === 'true') hideHint();
 
-    // --- REPORT ON MAP TAP ---
-    map.on('click', async (e) => {
+    // ============ ADD REPORT ============
+    async function addReport(lat, lng) {
       try {
         await addDoc(reportsRef, {
-          lat: e.latlng.lat,
-          lng: e.latlng.lng,
+          lat, lng,
           time: serverTimestamp(),
           clientId: getClientId(),
           confirmations: 1
         });
         hideHint();
-        if (navigator.vibrate) navigator.vibrate(30);
+        if (navigator.vibrate) navigator.vibrate(35);
         showToast('Meldung hinzugefügt');
+        return true;
       } catch (err) {
         console.error(err);
         showToast('Konnte nicht speichern');
+        return false;
+      }
+    }
+
+    // Tap map to report
+    map.on('click', (e) => {
+      // ignore if sheet is open
+      if (document.getElementById('sheet').classList.contains('open')) return;
+      addReport(e.latlng.lat, e.latlng.lng);
+    });
+
+    // FAB: report at my location
+    document.getElementById('report-btn').addEventListener('click', async () => {
+      showToast('Position wird ermittelt…', 1200);
+      try {
+        const pos = await getUserPosition();
+        const lat = pos.coords.latitude;
+        const lng = pos.coords.longitude;
+        showUserLocation(lat, lng);
+        map.setView([lat, lng], 16, { animate: true });
+        await addReport(lat, lng);
+      } catch (err) {
+        console.warn('Geolocation error:', err.message);
+        showToast('Standort nicht verfügbar');
       }
     });
 
-    // --- CONFIRM ("Noch da") ---
-    window.confirmReport = async function(docId) {
+    // ============ BOTTOM SHEET ============
+    let currentSheetId = null;
+    const sheetEl = document.getElementById('sheet');
+    const backdropEl = document.getElementById('sheet-backdrop');
+
+    function openSheet(docId, timestamp, confirmations) {
+      currentSheetId = docId;
+      const countText = confirmations > 0 ? ` · ${confirmations}× bestätigt` : '';
+      document.getElementById('sheet-meta').textContent = `${timeAgo(timestamp)}${countText}`;
+      sheetEl.classList.add('open');
+      backdropEl.classList.add('open');
+    }
+
+    function closeSheet() {
+      sheetEl.classList.remove('open');
+      backdropEl.classList.remove('open');
+      currentSheetId = null;
+    }
+
+    backdropEl.addEventListener('click', closeSheet);
+
+    // Confirm "Noch da"
+    document.getElementById('sheet-confirm').addEventListener('click', async () => {
+      if (!currentSheetId) return;
+      const id = currentSheetId;
+      closeSheet();
       try {
-        await updateDoc(doc(db, 'reports', docId), {
+        await updateDoc(doc(db, 'reports', id), {
           time: serverTimestamp(),
           confirmations: increment(1)
         });
@@ -508,22 +778,25 @@
         console.error(err);
         showToast('Konnte nicht bestätigen');
       }
-    };
+    });
 
-    // --- DELETE ---
-    window.deleteReport = async function(docId) {
+    // Delete
+    document.getElementById('sheet-delete').addEventListener('click', async () => {
+      if (!currentSheetId) return;
+      const id = currentSheetId;
       if (!confirm('Diese Meldung entfernen?')) return;
+      closeSheet();
       try {
-        await deleteDoc(doc(db, 'reports', docId));
+        await deleteDoc(doc(db, 'reports', id));
         showToast('Meldung entfernt');
         if (navigator.vibrate) navigator.vibrate(20);
       } catch (err) {
         console.error(err);
         showToast('Konnte nicht entfernen');
       }
-    };
+    });
 
-    // --- TIME HELPERS ---
+    // ============ TIME HELPERS ============
     function toDate(t) {
       if (!t) return null;
       if (t.toDate) return t.toDate();
@@ -549,85 +822,69 @@
       return (Date.now() - d.getTime()) / 60000;
     }
 
-    // --- POPUP HTML ---
-    function buildPopupHtml(docId, timestamp, confirmations = 0) {
-      const confirmedText = confirmations > 0
-        ? ` · ${confirmations}× bestätigt`
-        : '';
-      return `
-        <div class="popup">
-          <div class="popup-title">🚔 Polizei</div>
-          <div class="popup-age">${timeAgo(timestamp)}${confirmedText}</div>
-          <button class="popup-confirm" onclick="window.confirmReport('${docId}')">
-            ✓ Noch da
-          </button>
-          <button class="popup-clear" onclick="window.deleteReport('${docId}')">
-            Entfernen
-          </button>
-        </div>
-      `;
-    }
-
-    // --- MARKERS ---
+    // ============ MARKERS ============
     const markers = new Map();
 
-    function makeMarker(lat, lng, docId, timestamp, confirmations = 0) {
+    function makeMarker(lat, lng, docId, timestamp, confirmations) {
       const isOld = ageMinutes(timestamp) > REPORT_OLD_AFTER_MIN;
       const icon = L.divIcon({
         html: `<div class="police-marker-wrap ${isOld ? 'old' : ''}">
                  <div class="police-marker ${isOld ? 'old' : ''}">🚔</div>
                </div>`,
         className: '',
-        iconSize: [40, 40],
-        iconAnchor: [20, 20]
+        iconSize: [44, 44],
+        iconAnchor: [22, 22]
       });
 
       const marker = L.marker([lat, lng], { icon });
-      marker.bindPopup(buildPopupHtml(docId, timestamp, confirmations), {
-        minWidth: 200,
-        maxWidth: 260,
-        closeButton: false,
-        offset: [0, -12]
-      });
-      marker.on('popupopen', () => {
-        marker.setPopupContent(buildPopupHtml(docId, timestamp, confirmations));
+      marker.on('click', (e) => {
+        L.DomEvent.stopPropagation(e);
+        openSheet(docId, timestamp, confirmations);
       });
       return marker;
     }
 
-    // --- STATUS PILL ---
-    function updateStatusPill() {
-      const pill = document.getElementById('status-pill');
-      const n = markers.size;
-      if (n === 0) {
-        pill.textContent = 'Keine Meldungen';
-        pill.classList.add('empty');
-      } else {
-        pill.textContent = n === 1 ? '1 Meldung aktiv' : `${n} Meldungen aktiv`;
-        pill.classList.remove('empty');
+    function updateMarkerStyle(marker, timestamp) {
+      const isOld = ageMinutes(timestamp) > REPORT_OLD_AFTER_MIN;
+      const el = marker.getElement();
+      if (!el) return;
+      const wrap = el.querySelector('.police-marker-wrap');
+      const dot = el.querySelector('.police-marker');
+      if (wrap && dot) {
+        wrap.classList.toggle('old', isOld);
+        dot.classList.toggle('old', isOld);
       }
     }
 
-    // --- CLEANUP ---
+    // ============ LIVE BADGE ============
+    function updateLiveBadge() {
+      const badge = document.getElementById('live-badge');
+      const text = document.getElementById('live-text');
+      const n = markers.size;
+      if (n === 0) {
+        text.textContent = 'Bereit';
+        badge.classList.remove('active');
+      } else {
+        text.textContent = n === 1 ? '1 Meldung aktiv' : `${n} aktiv`;
+        badge.classList.add('active');
+      }
+    }
+
+    // ============ CLEANUP ============
     async function cleanupOldReports() {
       try {
         const cutoff = new Date(Date.now() - REPORT_MAX_AGE_MIN * 60 * 1000);
         const q = query(reportsRef, where('time', '<', cutoff));
         const snap = await getDocs(q);
-        let count = 0;
         for (const d of snap.docs) {
-          try {
-            await deleteDoc(d.ref);
-            count++;
-          } catch (_) {}
+          try { await deleteDoc(d.ref); } catch (_) {}
         }
-        if (count > 0) console.log(`Cleaned up ${count} old report(s)`);
       } catch (e) {
         console.warn('Cleanup failed:', e.message);
       }
     }
 
-    // --- FIRESTORE LISTENER ---
+    // ============ FIRESTORE LISTENER ============
     let isInitialLoad = true;
 
     onSnapshot(reportsRef, (snapshot) => {
@@ -635,40 +892,31 @@
         const id = change.doc.id;
         const data = change.doc.data();
 
-        // Handle "Noch da" updates — refresh timestamp + popup
+        // Updated (e.g. "Noch da")
         if (change.type === 'modified') {
           const entry = markers.get(id);
           if (entry) {
             entry.data = data;
-            entry.marker.setPopupContent(
-              buildPopupHtml(id, data.time, data.confirmations || 0)
-            );
-
-            const isOld = ageMinutes(data.time) > REPORT_OLD_AFTER_MIN;
-            const el = entry.marker.getElement();
-            if (el) {
-              const wrap = el.querySelector('.police-marker-wrap');
-              const dot = el.querySelector('.police-marker');
-              if (wrap && dot) {
-                wrap.classList.toggle('old', isOld);
-                dot.classList.toggle('old', isOld);
-              }
+            updateMarkerStyle(entry.marker, data.time);
+            if (currentSheetId === id) {
+              const countText = data.confirmations > 0 ? ` · ${data.confirmations}× bestätigt` : '';
+              document.getElementById('sheet-meta').textContent =
+                `${timeAgo(data.time)}${countText}`;
             }
           }
           return;
         }
 
-        // Handle new reports
+        // Added
         if (change.type === 'added') {
           if (ageMinutes(data.time) > REPORT_MAX_AGE_MIN) {
             deleteDoc(change.doc.ref).catch(() => {});
             return;
           }
-
+          const confirmations = data.confirmations || 0;
           const marker = makeMarker(
-            data.lat, data.lng, id, data.time, data.confirmations || 0
+            data.lat, data.lng, id, data.time, confirmations
           ).addTo(map);
-
           markers.set(id, { marker, data });
 
           if (!isInitialLoad && 'Notification' in window && Notification.permission === 'granted') {
@@ -682,46 +930,44 @@
                   tag: 'police-new',
                   renotify: true
                 });
-              } catch (e) { /* ignore */ }
+              } catch (e) {}
             }
           }
         }
 
-        // Handle deletions
+        // Removed
         if (change.type === 'removed') {
           const entry = markers.get(id);
           if (entry) {
             map.removeLayer(entry.marker);
             markers.delete(id);
           }
+          if (currentSheetId === id) closeSheet();
         }
       });
 
-      updateStatusPill();
+      updateLiveBadge();
       isInitialLoad = false;
     }, (err) => {
       console.error('Snapshot error:', err);
-      showToast('Verbindungsfehler – Seite neu laden');
+      showToast('Verbindungsfehler');
     });
 
-    // --- STARTUP ---
+    // ============ STARTUP ============
     cleanupOldReports();
     setInterval(cleanupOldReports, 10 * 60 * 1000);
 
-    // Refresh marker styling (old/new) every minute
+    // Refresh "old" styling every minute
     setInterval(() => {
       markers.forEach(({ marker, data }) => {
-        const isOld = ageMinutes(data.time) > REPORT_OLD_AFTER_MIN;
-        const el = marker.getElement();
-        if (!el) return;
-        const wrap = el.querySelector('.police-marker-wrap');
-        const dot = el.querySelector('.police-marker');
-        if (wrap && dot) {
-          wrap.classList.toggle('old', isOld);
-          dot.classList.toggle('old', isOld);
-        }
+        updateMarkerStyle(marker, data.time);
       });
     }, 60 * 1000);
+
+    // Escape closes sheet
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') closeSheet();
+    });
   </script>
 </body>
 </html>
