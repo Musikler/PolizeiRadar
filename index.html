@@ -341,7 +341,9 @@ button { font-family: inherit; border: none; background: none; color: inherit; c
 (function () {
   'use strict';
 
+  // ============================================================
   // Visible error reporting
+  // ============================================================
   var errorEl = document.getElementById('error-banner');
   function showError(msg) {
     errorEl.textContent = msg;
@@ -353,7 +355,9 @@ button { font-family: inherit; border: none; background: none; color: inherit; c
     showError('Fehler: ' + (e.message || 'Unbekannt'));
   });
 
+  // ============================================================
   // Toast
+  // ============================================================
   var toastEl = document.getElementById('toast');
   var toastTimer;
   function toast(msg, dur) {
@@ -363,7 +367,24 @@ button { font-family: inherit; border: none; background: none; color: inherit; c
     toastTimer = setTimeout(function () { toastEl.classList.remove('show'); }, dur || 2400);
   }
 
+  // ============================================================
+  // Service Worker — required for mobile notifications
+  // ============================================================
+  var swRegistration = null;
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('sw.js')
+      .then(function (reg) {
+        swRegistration = reg;
+        console.log('[OK] Service Worker registered');
+      })
+      .catch(function (err) {
+        console.warn('SW registration failed:', err);
+      });
+  }
+
+  // ============================================================
   // MAP — runs first, independent of Firebase
+  // ============================================================
   if (typeof L === 'undefined') {
     showError('Leaflet konnte nicht geladen werden. Prüfe Internet / Adblocker.');
     return;
@@ -379,7 +400,9 @@ button { font-family: inherit; border: none; background: none; color: inherit; c
 
   console.log('[OK] Map loaded');
 
+  // ============================================================
   // FIREBASE
+  // ============================================================
   var db = null;
   var reportsRef = null;
 
@@ -404,7 +427,9 @@ button { font-family: inherit; border: none; background: none; color: inherit; c
     }
   }
 
+  // ============================================================
   // Client ID
+  // ============================================================
   function uid() {
     try { return crypto.randomUUID(); } catch (e) {
       return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
@@ -419,12 +444,51 @@ button { font-family: inherit; border: none; background: none; color: inherit; c
     return id;
   }
 
-  // Notification icon — FIXED: use encodeURIComponent, not btoa (btoa chokes on emoji)
+  // ============================================================
+  // Notification icon (encodeURIComponent — btoa chokes on emoji)
+  // ============================================================
   var policeIcon = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(
     '<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64"><rect width="64" height="64" rx="14" fill="#2563eb"/><text x="32" y="44" text-anchor="middle" font-size="36">🚔</text></svg>'
   );
 
+  // ============================================================
+  // showNotification — routes through service worker (mobile-safe)
+  // ============================================================
+  function showNotification(title, options) {
+    options = options || {};
+
+    // Preferred path: service worker (required on Android, robust on desktop)
+    if ('serviceWorker' in navigator) {
+      var readyPromise = swRegistration
+        ? Promise.resolve(swRegistration)
+        : navigator.serviceWorker.ready;
+
+      readyPromise.then(function (reg) {
+        return reg.showNotification(title, {
+          body: options.body || '',
+          icon: options.icon || policeIcon,
+          badge: options.badge || policeIcon,
+          tag: options.tag || 'polizei-radar',
+          renotify: true,
+          vibrate: [200, 100, 200]
+        });
+      }).catch(function (err) {
+        console.warn('SW showNotification failed:', err);
+        // Last-resort fallback (older desktop browsers)
+        try { new Notification(title, options); } catch (e) {}
+      });
+      return;
+    }
+
+    // Fallback: direct Notification (desktop-only, older browsers)
+    try { new Notification(title, options); } catch (e) {
+      console.warn('Notification unavailable:', e);
+    }
+  }
+
+  // ============================================================
   // User location dot
+  // ============================================================
   var userMarker = null;
   var userIcon = L.divIcon({
     html: '<div class="user-dot"><div class="user-dot-inner"></div></div>',
@@ -437,7 +501,9 @@ button { font-family: inherit; border: none; background: none; color: inherit; c
     else userMarker = L.marker([lat, lng], { icon: userIcon, interactive: false, zIndexOffset: -100 }).addTo(map);
   }
 
+  // ============================================================
   // Geolocation
+  // ============================================================
   function getPos() {
     return new Promise(function (resolve, reject) {
       if (!navigator.geolocation) return reject(new Error('not-supported'));
@@ -459,7 +525,9 @@ button { font-family: inherit; border: none; background: none; color: inherit; c
     });
   });
 
-  // Notifications
+  // ============================================================
+  // Notifications — permission flow
+  // ============================================================
   var notifyBtn = document.getElementById('notify-btn');
   function refreshNotifyBtn() {
     if (!('Notification' in window)) { notifyBtn.disabled = true; return; }
@@ -476,14 +544,18 @@ button { font-family: inherit; border: none; background: none; color: inherit; c
       refreshNotifyBtn();
       if (result === 'granted') {
         toast('Benachrichtigungen aktiviert ✓');
-        try { new Notification('Polizei Radar', { body: 'Du wirst bei neuen Meldungen benachrichtigt.', icon: policeIcon }); } catch (e) {}
+        showNotification('Polizei Radar', {
+          body: 'Du wirst bei neuen Meldungen benachrichtigt.'
+        });
       } else {
         toast('Nicht aktiviert');
       }
     }).catch(function () { toast('Fehler beim Aktivieren'); });
   });
 
+  // ============================================================
   // Hint
+  // ============================================================
   var hintEl = document.getElementById('hint');
   if (localStorage.getItem('polizei_has_reported') === 'true') hintEl.classList.add('hidden');
   function hideHint() {
@@ -491,7 +563,9 @@ button { font-family: inherit; border: none; background: none; color: inherit; c
     localStorage.setItem('polizei_has_reported', 'true');
   }
 
+  // ============================================================
   // Add report
+  // ============================================================
   function addReport(lat, lng) {
     if (!reportsRef) { toast('Datenbank nicht verfügbar'); return Promise.resolve(false); }
     return reportsRef.add({
@@ -530,7 +604,9 @@ button { font-family: inherit; border: none; background: none; color: inherit; c
     });
   });
 
+  // ============================================================
   // Bottom sheet
+  // ============================================================
   var sheetEl = document.getElementById('sheet');
   var backdropEl = document.getElementById('backdrop');
   var sheetMeta = document.getElementById('sheet-meta');
@@ -581,7 +657,9 @@ button { font-family: inherit; border: none; background: none; color: inherit; c
     });
   });
 
+  // ============================================================
   // Time helpers
+  // ============================================================
   function toDate(t) {
     if (!t) return null;
     if (t.toDate) return t.toDate();
@@ -605,7 +683,9 @@ button { font-family: inherit; border: none; background: none; color: inherit; c
     return (Date.now() - d.getTime()) / 60000;
   }
 
+  // ============================================================
   // Markers
+  // ============================================================
   var markers = {};
 
   function makeMarker(lat, lng, id, timestamp, confirmations) {
@@ -637,7 +717,9 @@ button { font-family: inherit; border: none; background: none; color: inherit; c
     }
   }
 
+  // ============================================================
   // Live badge
+  // ============================================================
   function updateBadge() {
     var status = document.getElementById('status');
     var text = document.getElementById('status-text');
@@ -651,7 +733,9 @@ button { font-family: inherit; border: none; background: none; color: inherit; c
     }
   }
 
+  // ============================================================
   // Cleanup old reports
+  // ============================================================
   function cleanup() {
     if (!reportsRef) return;
     var cutoff = new Date(Date.now() - 90 * 60 * 1000);
@@ -660,7 +744,9 @@ button { font-family: inherit; border: none; background: none; color: inherit; c
     }).catch(function (e) { console.warn('cleanup:', e.message); });
   }
 
+  // ============================================================
   // Real-time listener
+  // ============================================================
   if (reportsRef) {
     var isInitial = true;
     reportsRef.onSnapshot(function (snapshot) {
@@ -694,12 +780,9 @@ button { font-family: inherit; border: none; background: none; color: inherit; c
             var isMine = data.clientId === getClientId();
             var recent = ageMin(data.time) < 1;
             if (!isMine && recent) {
-              try {
-                new Notification('🚔 Polizei gemeldet', {
-                  body: 'In deiner Nähe wurde eine Polizei gemeldet.',
-                  icon: policeIcon
-                });
-              } catch (e) {}
+              showNotification('🚔 Polizei gemeldet', {
+                body: 'In deiner Nähe wurde eine Polizei gemeldet.'
+              });
             }
           }
         }
