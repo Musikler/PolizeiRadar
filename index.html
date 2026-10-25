@@ -333,7 +333,6 @@ button { font-family: inherit; border: none; background: none; color: inherit; c
 
 <div id="toast"></div>
 
-<!-- Classic scripts, NOT modules — no imports that can silently fail -->
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
@@ -342,9 +341,7 @@ button { font-family: inherit; border: none; background: none; color: inherit; c
 (function () {
   'use strict';
 
-  // ============================================================
-  // STEP 0 — Visible error reporting
-  // ============================================================
+  // Visible error reporting
   var errorEl = document.getElementById('error-banner');
   function showError(msg) {
     errorEl.textContent = msg;
@@ -356,9 +353,7 @@ button { font-family: inherit; border: none; background: none; color: inherit; c
     showError('Fehler: ' + (e.message || 'Unbekannt'));
   });
 
-  // ============================================================
-  // STEP 1 — Toast
-  // ============================================================
+  // Toast
   var toastEl = document.getElementById('toast');
   var toastTimer;
   function toast(msg, dur) {
@@ -368,9 +363,7 @@ button { font-family: inherit; border: none; background: none; color: inherit; c
     toastTimer = setTimeout(function () { toastEl.classList.remove('show'); }, dur || 2400);
   }
 
-  // ============================================================
-  // STEP 2 — MAP (runs BEFORE anything Firebase — map always shows)
-  // ============================================================
+  // MAP — runs first, independent of Firebase
   if (typeof L === 'undefined') {
     showError('Leaflet konnte nicht geladen werden. Prüfe Internet / Adblocker.');
     return;
@@ -386,9 +379,7 @@ button { font-family: inherit; border: none; background: none; color: inherit; c
 
   console.log('[OK] Map loaded');
 
-  // ============================================================
-  // STEP 3 — FIREBASE (best-effort; map works even if this fails)
-  // ============================================================
+  // FIREBASE
   var db = null;
   var reportsRef = null;
 
@@ -413,9 +404,7 @@ button { font-family: inherit; border: none; background: none; color: inherit; c
     }
   }
 
-  // ============================================================
-  // STEP 4 — Client ID (own report detection)
-  // ============================================================
+  // Client ID
   function uid() {
     try { return crypto.randomUUID(); } catch (e) {
       return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
@@ -430,16 +419,12 @@ button { font-family: inherit; border: none; background: none; color: inherit; c
     return id;
   }
 
-  // ============================================================
-  // STEP 5 — Notification icon
-  // ============================================================
-  var policeIcon = 'data:image/svg+xml;base64,' + btoa(
+  // Notification icon — FIXED: use encodeURIComponent, not btoa (btoa chokes on emoji)
+  var policeIcon = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(
     '<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64"><rect width="64" height="64" rx="14" fill="#2563eb"/><text x="32" y="44" text-anchor="middle" font-size="36">🚔</text></svg>'
   );
 
-  // ============================================================
-  // STEP 6 — User location dot
-  // ============================================================
+  // User location dot
   var userMarker = null;
   var userIcon = L.divIcon({
     html: '<div class="user-dot"><div class="user-dot-inner"></div></div>',
@@ -452,9 +437,7 @@ button { font-family: inherit; border: none; background: none; color: inherit; c
     else userMarker = L.marker([lat, lng], { icon: userIcon, interactive: false, zIndexOffset: -100 }).addTo(map);
   }
 
-  // ============================================================
-  // STEP 7 — Geolocation
-  // ============================================================
+  // Geolocation
   function getPos() {
     return new Promise(function (resolve, reject) {
       if (!navigator.geolocation) return reject(new Error('not-supported'));
@@ -476,11 +459,8 @@ button { font-family: inherit; border: none; background: none; color: inherit; c
     });
   });
 
-  // ============================================================
-  // STEP 8 — Notifications
-  // ============================================================
+  // Notifications
   var notifyBtn = document.getElementById('notify-btn');
-
   function refreshNotifyBtn() {
     if (!('Notification' in window)) { notifyBtn.disabled = true; return; }
     if (Notification.permission === 'granted') notifyBtn.classList.add('active');
@@ -503,9 +483,7 @@ button { font-family: inherit; border: none; background: none; color: inherit; c
     }).catch(function () { toast('Fehler beim Aktivieren'); });
   });
 
-  // ============================================================
-  // STEP 9 — Hint (hide after first report)
-  // ============================================================
+  // Hint
   var hintEl = document.getElementById('hint');
   if (localStorage.getItem('polizei_has_reported') === 'true') hintEl.classList.add('hidden');
   function hideHint() {
@@ -513,9 +491,7 @@ button { font-family: inherit; border: none; background: none; color: inherit; c
     localStorage.setItem('polizei_has_reported', 'true');
   }
 
-  // ============================================================
-  // STEP 10 — Add report
-  // ============================================================
+  // Add report
   function addReport(lat, lng) {
     if (!reportsRef) { toast('Datenbank nicht verfügbar'); return Promise.resolve(false); }
     return reportsRef.add({
@@ -554,9 +530,7 @@ button { font-family: inherit; border: none; background: none; color: inherit; c
     });
   });
 
-  // ============================================================
-  // STEP 11 — Bottom sheet
-  // ============================================================
+  // Bottom sheet
   var sheetEl = document.getElementById('sheet');
   var backdropEl = document.getElementById('backdrop');
   var sheetMeta = document.getElementById('sheet-meta');
@@ -607,9 +581,7 @@ button { font-family: inherit; border: none; background: none; color: inherit; c
     });
   });
 
-  // ============================================================
-  // STEP 12 — Time helpers
-  // ============================================================
+  // Time helpers
   function toDate(t) {
     if (!t) return null;
     if (t.toDate) return t.toDate();
@@ -633,10 +605,8 @@ button { font-family: inherit; border: none; background: none; color: inherit; c
     return (Date.now() - d.getTime()) / 60000;
   }
 
-  // ============================================================
-  // STEP 13 — Markers
-  // ============================================================
-  var markers = {}; // id -> { marker, data }
+  // Markers
+  var markers = {};
 
   function makeMarker(lat, lng, id, timestamp, confirmations) {
     var isOld = ageMin(timestamp) > 20;
@@ -667,9 +637,7 @@ button { font-family: inherit; border: none; background: none; color: inherit; c
     }
   }
 
-  // ============================================================
-  // STEP 14 — Live badge
-  // ============================================================
+  // Live badge
   function updateBadge() {
     var status = document.getElementById('status');
     var text = document.getElementById('status-text');
@@ -683,9 +651,7 @@ button { font-family: inherit; border: none; background: none; color: inherit; c
     }
   }
 
-  // ============================================================
-  // STEP 15 — Cleanup old reports
-  // ============================================================
+  // Cleanup old reports
   function cleanup() {
     if (!reportsRef) return;
     var cutoff = new Date(Date.now() - 90 * 60 * 1000);
@@ -694,9 +660,7 @@ button { font-family: inherit; border: none; background: none; color: inherit; c
     }).catch(function (e) { console.warn('cleanup:', e.message); });
   }
 
-  // ============================================================
-  // STEP 16 — Real-time listener
-  // ============================================================
+  // Real-time listener
   if (reportsRef) {
     var isInitial = true;
     reportsRef.onSnapshot(function (snapshot) {
